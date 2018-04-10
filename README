@@ -11,10 +11,21 @@ nss-tls is a name resolving library for glibc
 (https://www.gnu.org/software/libc/), which performs DNS queries over HTTPS
 through 1.1.1.1 (https://developers.cloudflare.com/1.1.1.1/dns-over-https/).
 
+Dependencies
+============
+
+nss-tls depends on:
+  - glibc (https://www.gnu.org/software/libc/)
+  - GLib (https://wiki.gnome.org/Projects/GLib)
+  - libsoup (https://wiki.gnome.org/Projects/libsoup)
+  - JSON-GLib (https://wiki.gnome.org/Projects/JsonGlib)
+
+nss-tls uses Meson (http://mesonbuild.com/) as its build system.
+
 Usage
 =====
 
-Assuming your system runs glibc (https://www.gnu.org/software/libc/) and systemd
+Assuming your system runs systemd
 (https://www.freedesktop.org/wiki/Software/systemd/):
 
   1) meson --prefix=/usr build
