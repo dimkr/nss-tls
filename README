@@ -17,12 +17,11 @@ Architecture
 nss-tls consists of two parts:
   - nss-tlsd runs in the background and receives DNS resolving requests over a
     Unix socket
-  - libnss_tls.so is a client library which delegates the resolving work to
-    nss-tlsd through the Unix sockets and passes the results back to the
+  - libnss_tls.so is a tiny client library which delegates the resolving work to
+    nss-tlsd through the Unix socket and passes the results back to the
     application. This way, applications that take advantage of nss-tls are not
     affected by the complexity and the resource consumption of the libraries it
-    depends on, or the constraints they impose on applications that use
-    them.
+    depends on, or the constraints they impose on applications that use them.
 
 Dependencies
 ============
