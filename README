@@ -11,6 +11,19 @@ nss-tls is a name resolving library for glibc
 (https://www.gnu.org/software/libc/), which performs DNS queries over HTTPS
 through 1.1.1.1 (https://developers.cloudflare.com/1.1.1.1/dns-over-https/).
 
+Architecture
+============
+
+nss-tls consists of two parts:
+  - nss-tlsd runs in the background and receives DNS resolving requests over a
+    Unix socket
+  - libnss_tls.so is a client library which delegates the resolving work to
+    nss-tlsd through the Unix sockets and passes the results back to the
+    application. This way, applications that take advantage of nss-tls are not
+    affected by the complexity and the resource consumption of the libraries it
+    depends on, or the constraints they impose on applications that use
+    them.
+
 Dependencies
 ============
 
@@ -32,7 +45,8 @@ Assuming your system runs systemd
   2) ninja -C build install
   3) systemctl daemon-reload
   4) systemctl start nss-tlsd
-  5) Add "tls" to the "hosts" entry in /etc/nsswitch.conf
+  5) ldconfig
+  6) Add "tls" to the "hosts" entry in /etc/nsswitch.conf
 
 Legal Information
 =================
