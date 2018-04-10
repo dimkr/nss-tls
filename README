@@ -1,0 +1,34 @@
+                     _   _
+ _ __  ___ ___      | |_| |___
+| '_ \/ __/ __|_____| __| / __|
+| | | \__ \__ \_____| |_| \__ \
+|_| |_|___/___/      \__|_|___/
+
+Overview
+========
+
+nss-tls is a name resolving library for glibc
+(https://www.gnu.org/software/libc/), which performs DNS queries over HTTPS
+through 1.1.1.1 (https://developers.cloudflare.com/1.1.1.1/dns-over-https/).
+
+Usage
+=====
+
+Assuming your system runs glibc (https://www.gnu.org/software/libc/) and systemd
+(https://www.freedesktop.org/wiki/Software/systemd/):
+
+  1) meson --prefix=/usr build
+  2) ninja -C build install
+  3) systemctl daemon-reload
+  4) systemctl start nss-tlsd
+  5) Add "tls" to the "hosts" entry in /etc/nsswitch.conf
+
+Legal Information
+=================
+
+nss-tls is free and unencumbered software released under the terms of the GNU
+Lesser General Public License as published by the Free Software Foundation;
+either version 2.1 of the License, or (at your option) any later version
+license.
+
+The ASCII art logo at the top was made using FIGlet (http://www.figlet.org/).
