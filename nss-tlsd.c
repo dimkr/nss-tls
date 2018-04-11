@@ -38,7 +38,33 @@ struct nss_tls_query {
     struct nss_tls_res res;
     gint64 type;
     GSocketConnection *connection;
+    SoupSession *session;
+    SoupMessage *message;
 };
+
+static
+void
+on_close (GObject       *source_object,
+          GAsyncResult  *res,
+          gpointer      user_data)
+{
+    struct nss_tls_query *query = (struct nss_tls_query *)user_data;
+
+    g_io_stream_close_finish (G_IO_STREAM (source_object), res, NULL);
+    g_object_unref (query->connection);
+    g_free (query);
+}
+
+static
+void
+stop_query (struct nss_tls_query *query)
+{
+    g_io_stream_close_async (G_IO_STREAM (query->connection),
+                             G_PRIORITY_DEFAULT,
+                             NULL,
+                             on_close,
+                             query);
+}
 
 static
 void
@@ -62,8 +88,7 @@ on_done (GObject         *source_object,
         g_debug ("Failed to query %s", query->req.name);
     }
 
-    g_object_unref (query->connection);
-    g_free (query);
+    stop_query (query);
 }
 
 static
@@ -145,7 +170,7 @@ on_res (GObject         *source_object,
         else {
             g_warning ("Failed to query %s", query->req.name);
         }
-        goto fail;
+        goto cleanup;
     }
 
     j = json_parser_new ();
@@ -158,19 +183,19 @@ on_res (GObject         *source_object,
         else {
             g_warning ("Failed to parse the result for %s", query->req.name);
         }
-        goto fail;
+        goto cleanup;
     }
 
     root = json_parser_get_root (j);
     rooto = json_node_get_object (root);
     if (!rooto) {
         g_warning ("No root object for %s", query->req.name);
-        goto fail;
+        goto cleanup;
     }
 
     if (!json_object_has_member (rooto, "Answer")) {
         g_warning ("No Answer member for %s", query->req.name);
-        goto fail;
+        goto cleanup;
     }
     answers = json_object_get_array_member (rooto, "Answer");
 
@@ -188,7 +213,7 @@ on_res (GObject         *source_object,
                                          query);
     }
 
-fail:
+cleanup:
     if (j) {
         g_object_unref (j);
     }
@@ -197,9 +222,18 @@ fail:
         g_error_free (err);
     }
 
+    if (in) {
+        g_object_unref (in);
+    }
+
     if (query->res.count == 0) {
-        g_object_unref (query->connection);
-        g_free (query);
+        stop_query (query);
+    }
+    else {
+        g_object_unref (query->message);
+        query->message = NULL;
+        g_object_unref (query->session);
+        query->session = NULL;
     }
 }
 
@@ -210,11 +244,12 @@ on_req (GObject         *source_object,
         gpointer        user_data)
 {
     GError *err = NULL;
-    SoupSession *sess;
-    SoupMessage *msg;
     gchar *url;
     struct nss_tls_query *query = user_data;
     gsize len;
+
+    query->session = NULL;
+    query->message = NULL;
 
     if (!g_input_stream_read_all_finish (G_INPUT_STREAM (source_object),
                                          res,
@@ -258,17 +293,20 @@ on_req (GObject         *source_object,
 
     g_debug ("Fetching %s", url);
 
-    sess = soup_session_new ();
-    msg = soup_message_new ("GET", url);
+    query->session = soup_session_new ();
+    query->message = soup_message_new ("GET", url);
 
-    soup_session_send_async (sess, msg, NULL, on_res, query);
+    soup_session_send_async (query->session,
+                             query->message,
+                             NULL,
+                             on_res,
+                             query);
     g_free (url);
 
     return;
 
 fail:
-    g_object_unref (query->connection);
-    g_free (query);
+    stop_query (query);
 }
 
 static void
