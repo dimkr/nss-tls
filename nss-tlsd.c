@@ -54,8 +54,11 @@ on_done (GObject         *source_object,
                                           &out,
                                           NULL) &&
         (out == sizeof(query->res))) {
-        g_debug ("Done querying %s (%hhu results)", query->req.name, query->res.count);
-    } else {
+        g_debug ("Done querying %s (%hhu results)",
+                 query->req.name,
+                 query->res.count);
+    }
+    else {
         g_debug ("Failed to query %s", query->req.name);
     }
 
@@ -72,9 +75,9 @@ on_answer (JsonArray    *array,
 {
     struct nss_tls_query *query = (struct nss_tls_query *)user_data;
     JsonObject *answero;
-    JsonNode *type, *data;
-    const gchar *s;
-    gint64 i;
+    const gchar *data;
+    void *dst = &query->res.addrs[query->res.count].in;
+    gint64 type;
 
     if (query->res.count >=
                        sizeof(query->res.addrs) / sizeof(query->res.addrs[0])) {
@@ -83,32 +86,34 @@ on_answer (JsonArray    *array,
 
     answero = json_node_get_object (element_node);
 
-    type = json_object_get_member (answero, "type");
-    if (!type) {
+    if (!json_object_has_member (answero, "type")) {
         g_warning ("No type member for %s", query->req.name);
         return;
     }
 
     /* if the type doesn't match, it's OK - continue to the next answer */
-    i = json_node_get_int (type);
-    if (i != query->type) {
+    type = json_object_get_int_member (answero, "type");
+    if (type != query->type) {
         return;
     }
 
-    data = json_object_get_member (answero, "data");
-    if (!data) {
+    if (!json_object_has_member (answero, "data")) {
         g_debug ("No data for answer %u of %s", index_, query->req.name);
         return;
     }
 
-    s = json_node_get_string (data);
-    if (!s) {
+    data = json_object_get_string_member (answero, "data");
+    if (!data) {
         g_debug ("Invalid data for answer %u of %s", index_, query->req.name);
         return;
     }
 
-    if (inet_pton (query->req.af, s, &query->res.addrs[query->res.count])) {
-        g_debug ("%s[%hhu] = %s", query->req.name, query->res.count, s);
+    if (query->req.af == AF_INET6) {
+        dst = &query->res.addrs[query->res.count].in6;
+    }
+
+    if (inet_pton (query->req.af, data, dst)) {
+        g_debug ("%s[%hhu] = %s", query->req.name, query->res.count, data);
         ++query->res.count;
     }
 }
@@ -136,7 +141,8 @@ on_res (GObject         *source_object,
             g_warning ("Failed to query %s: %s",
                        query->req.name,
                        err->message);
-        } else {
+        }
+        else {
             g_warning ("Failed to query %s", query->req.name);
         }
         goto fail;
@@ -148,7 +154,8 @@ on_res (GObject         *source_object,
             g_warning ("Failed to parse the result for %s: %s",
                        query->req.name,
                        err->message);
-        } else {
+        }
+        else {
             g_warning ("Failed to parse the result for %s", query->req.name);
         }
         goto fail;
@@ -161,11 +168,11 @@ on_res (GObject         *source_object,
         goto fail;
     }
 
-    answers = json_object_get_array_member (rooto, "Answer");
-    if (!answers) {
+    if (!json_object_has_member (rooto, "Answer")) {
         g_warning ("No Answer member for %s", query->req.name);
         goto fail;
     }
+    answers = json_object_get_array_member (rooto, "Answer");
 
     query->res.count = 0;
     json_array_foreach_element (answers, on_answer, query);
@@ -217,8 +224,9 @@ on_req (GObject         *source_object,
             g_warning ("Failed to receive a request: %s", err->message);
             g_error_free (err);
         }
-        else
+        else {
             g_warning ("Failed to receive a request");
+        }
         goto fail;
     }
 
@@ -233,13 +241,15 @@ on_req (GObject         *source_object,
     case AF_INET:
         /* A */
         query->type = 1;
-        url = g_strdup_printf ("https://"NSS_TLS_RESOLVER"/dns-query?ct=application/dns-json&name=%s&type=A", query->req.name);
+        url = g_strdup_printf ("https://"NSS_TLS_RESOLVER"/dns-query?ct=application/dns-json&name=%s&type=A",
+                               query->req.name);
         break;
 
     case AF_INET6:
         /* AAAA */
         query->type = 28;
-        url = g_strdup_printf ("https://"NSS_TLS_RESOLVER"/dns-query?ct=application/dns-json&name=%s&type=AAAA", query->req.name);
+        url = g_strdup_printf ("https://"NSS_TLS_RESOLVER"/dns-query?ct=application/dns-json&name=%s&type=AAAA",
+                               query->req.name);
         break;
 
     default:
