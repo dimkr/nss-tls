@@ -95,18 +95,21 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
     switch (af) {
     case AF_INET:
         ret->h_length = sizeof(struct in_addr);
+
+        for (i = 0; i < res.count; ++i)
+            addrs[i] = (char *)&res.addrs[i].in;
         break;
 
     case AF_INET6:
         ret->h_length = sizeof(struct in6_addr);
+
+        for (i = 0; i < res.count; ++i)
+            addrs[i] = (char *)&res.addrs[i].in6;
         break;
 
     default:
         return NSS_STATUS_NOTFOUND;
     }
-
-    for (i = 0; i < res.count; ++i)
-        addrs[i] = (char *)&res.addrs[i];
 
     addrs[i] = NULL;
 
