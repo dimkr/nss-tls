@@ -40,9 +40,16 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
     struct sockaddr_un sun = {.sun_family = AF_UNIX};
     struct nss_tls_req req;
     struct nss_tls_res res;
-    char *addrs[] = {(char *)&res.addr, NULL};
-    char *aliases[] = {NULL};
-    int s;
+    struct timeval tv = {.tv_sec = NSS_TLS_TIMEOUT / 2, .tv_usec = 0};
+    char **aliases = (char **)buf;
+    char **addrs = (char **)(buf + sizeof(char **));
+    ssize_t out;
+    int s, i;
+
+    if (buflen < (sizeof(char *) * (sizeof(res.addrs) / sizeof(res.addrs[0]) + 1))) {
+        *errnop = ERANGE;
+        return NSS_STATUS_TRYAGAIN;
+    }
 
     *errnop = ENOENT;
 
@@ -57,6 +64,12 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
         return NSS_STATUS_TRYAGAIN;
     }
 
+    if ((setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) < 0) ||
+        (setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)) {
+        close(s);
+        return NSS_STATUS_TRYAGAIN;
+    }
+
     strcpy(sun.sun_path, NSS_TLS_SOCKET);
     if (connect(s, (const struct sockaddr *)&sun, sizeof(sun)) < 0) {
         close(s);
@@ -68,13 +81,16 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
     req.name[sizeof(req.name) - 1] = '\0';
     if (send(s, &req, sizeof(req), 0) != sizeof(req)) {
         close(s);
-        return NSS_STATUS_UNAVAIL;
+        return NSS_STATUS_TRYAGAIN;
     }
 
-    if (recv(s, &res, sizeof(res), 0) != sizeof(res)) {
-        close(s);
+    out = recv(s, &res, sizeof(res), 0);
+    close(s);
+
+    if (out == 0)
         return NSS_STATUS_NOTFOUND;
-    }
+    else if (out != sizeof(res))
+        return NSS_STATUS_TRYAGAIN;
 
     switch (af) {
     case AF_INET:
@@ -89,10 +105,17 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
         return NSS_STATUS_NOTFOUND;
     }
 
-    ret->h_name = req.name;
+    for (i = 0; i < res.count; ++i)
+        addrs[i] = (char *)&res.addrs[i];
+
+    addrs[i] = NULL;
+
+    ret->h_name = NULL;
+    aliases[0] = NULL;
     ret->h_aliases = aliases;
     ret->h_addrtype = af;
     ret->h_addr_list = addrs;
 
+    *errnop = 0;
     return NSS_STATUS_SUCCESS;
 }

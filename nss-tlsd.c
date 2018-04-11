@@ -38,7 +38,6 @@ struct nss_tls_query {
     struct nss_tls_res res;
     gint64 type;
     GSocketConnection *connection;
-    gboolean ok;
 };
 
 static
@@ -48,12 +47,14 @@ on_done (GObject         *source_object,
          gpointer        user_data)
 {
     struct nss_tls_query *query = (struct nss_tls_query *)user_data;
+    gsize out;
 
     if (g_output_stream_write_all_finish (G_OUTPUT_STREAM (source_object),
                                           res,
-                                          NULL,
-                                          NULL)) {
-        g_debug ("Done querying %s", query->req.name);
+                                          &out,
+                                          NULL) &&
+        (out == sizeof(query->res))) {
+        g_debug ("Done querying %s (%hhu results)", query->req.name, query->res.count);
     } else {
         g_debug ("Failed to query %s", query->req.name);
     }
@@ -74,6 +75,11 @@ on_answer (JsonArray    *array,
     JsonNode *type, *data;
     const gchar *s;
     gint64 i;
+
+    if (query->res.count >=
+                       sizeof(query->res.addrs) / sizeof(query->res.addrs[0])) {
+        return;
+    }
 
     answero = json_node_get_object (element_node);
 
@@ -101,9 +107,9 @@ on_answer (JsonArray    *array,
         return;
     }
 
-    if (inet_pton (query->req.af, s, &query->res.addr)) {
-        g_debug ("%s = %s", query->req.name, s);
-        query->ok = TRUE;
+    if (inet_pton (query->req.af, s, &query->res.addrs[query->res.count])) {
+        g_debug ("%s[%hhu] = %s", query->req.name, query->res.count, s);
+        ++query->res.count;
     }
 }
 
@@ -121,8 +127,6 @@ on_res (GObject         *source_object,
     JsonObject *rooto;
     JsonArray *answers;
     GOutputStream *out;
-
-    query->ok = FALSE;
 
     in = soup_session_send_finish (SOUP_SESSION (source_object),
                                    res,
@@ -163,9 +167,10 @@ on_res (GObject         *source_object,
         goto fail;
     }
 
+    query->res.count = 0;
     json_array_foreach_element (answers, on_answer, query);
 
-    if (query->ok) {
+    if (query->res.count > 0) {
         out = g_io_stream_get_output_stream (G_IO_STREAM (query->connection));
         g_output_stream_write_all_async (out,
                                          &query->res,
@@ -177,18 +182,18 @@ on_res (GObject         *source_object,
     }
 
 fail:
-    if (j)
+    if (j) {
         g_object_unref (j);
-
-    if (query->ok)
-        return;
+    }
 
     if (err) {
         g_error_free (err);
     }
 
-    g_object_unref (query->connection);
-    g_free (query);
+    if (query->res.count == 0) {
+        g_object_unref (query->connection);
+        g_free (query);
+    }
 }
 
 static

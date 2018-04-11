@@ -1,2 +1,2 @@
 option('resolver', type: 'string', value: 'cloudflare-dns.com')
-option('timeout', type: 'integer', value: 5)
+option('timeout', type: 'integer', value: 4)

@@ -17,7 +17,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
+#include <inttypes.h>
 #include <netinet/in.h>
+
+#define NSS_TLS_ADDRS_MAX 16
 
 struct nss_tls_req {
     int af;
@@ -25,8 +28,9 @@ struct nss_tls_req {
 } __attribute__((packed));
 
 struct nss_tls_res {
+    uint8_t count;
     union {
         struct in_addr in;
         struct in6_addr in6;
-    } addr;
+    } addrs[NSS_TLS_ADDRS_MAX];
 } __attribute__((packed));

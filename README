@@ -43,9 +43,10 @@ Assuming your system runs systemd
   1) meson --prefix=/usr build
   2) ninja -C build install
   3) systemctl daemon-reload
-  4) systemctl start nss-tlsd
-  5) ldconfig
-  6) Add "tls" to the "hosts" entry in /etc/nsswitch.conf
+  4) systemctl enable nss-tlsd
+  5) systemctl start nss-tlsd
+  6) ldconfig
+  7) Add "tls" to the "hosts" entry in /etc/nsswitch.conf
 
 Legal Information
 =================
