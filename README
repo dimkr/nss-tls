@@ -68,7 +68,8 @@ Assuming your system runs systemd
   4) systemctl enable nss-tlsd
   5) systemctl start nss-tlsd
   6) ldconfig
-  7) Add "tls" to the "hosts" entry in /etc/nsswitch.conf
+  7) Add "tls" to the "hosts" entry in /etc/nsswitch.conf, before "dns" or
+     anything else that contains "dns" in its name
 
 Performance
 ===========
