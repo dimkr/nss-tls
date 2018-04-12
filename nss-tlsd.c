@@ -54,6 +54,7 @@ on_close (GObject       *source_object,
 
     if (query->session) {
         soup_session_abort (query->session);
+        g_object_unref (query->session);
     }
 
     g_object_unref (query->connection);
