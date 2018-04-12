@@ -53,7 +53,7 @@ nss_tlsd_service = configure_file(input: 'nss-tlsd.service.in',
                                   output: 'nss-tlsd.service',
                                   configuration: cfg)
 install_data(nss_tlsd_service,
-             install_dir: join_paths(get_option('sysconfdir'),
+             install_dir: join_paths(get_option('libdir'),
                                      'systemd',
                                      'system'))
 
