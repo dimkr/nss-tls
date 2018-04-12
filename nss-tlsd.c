@@ -231,12 +231,13 @@ cleanup:
         g_object_unref (in);
     }
 
+    g_object_unref (query->message);
+    query->message = NULL;
+
     if (query->res.count == 0) {
         stop_query (query);
     }
     else {
-        g_object_unref (query->message);
-        query->message = NULL;
         g_object_unref (query->session);
         query->session = NULL;
     }
