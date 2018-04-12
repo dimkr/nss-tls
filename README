@@ -62,7 +62,7 @@ Usage
 Assuming your system runs systemd
 (https://www.freedesktop.org/wiki/Software/systemd/):
 
-  1) meson --prefix=/usr build
+  1) meson --prefix=/usr --buildtype=release -Dstrip=true build
   2) ninja -C build install
   3) systemctl daemon-reload
   4) systemctl enable nss-tlsd
