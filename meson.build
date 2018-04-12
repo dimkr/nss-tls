@@ -16,12 +16,22 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-project('nss-tls', 'c', version: '0.1')
+project('nss-tls', 'c', version: '0.1', license : ['LGPL2.1+'])
 
-add_project_arguments('-DNSS_TLS_RESOLVER="@0@"'.format(get_option('resolver')),
-                      '-DNSS_TLS_SOCKET="@0@/run/nss-tls.socket"'.format(get_option('localstatedir')),
-                      '-DNSS_TLS_TIMEOUT=@0@'.format(get_option('timeout')),
-                      language: 'c')
+nss_tls_socket = '@0@/run/nss-tls.socket'.format(get_option('localstatedir'))
+nss_tls_user_agent = '@0@/@1@'.format(meson.project_name(),
+                                      meson.project_version())
+nss_tlsd_path = join_paths(get_option('prefix'),
+                           get_option('sbindir'),
+                           'nss-tlsd')
+
+add_project_arguments(
+    '-DNSS_TLS_RESOLVER="@0@"'.format(get_option('resolver')),
+    '-DNSS_TLS_SOCKET="@0@"'.format(nss_tls_socket),
+    '-DNSS_TLS_TIMEOUT=@0@'.format(get_option('timeout')),
+    '-DNSS_TLS_USER_AGENT="@0@"'.format(nss_tls_user_agent),
+    language: 'c'
+)
 
 nss_tlsd = executable('nss-tlsd',
                       'nss-tlsd.c',
@@ -38,11 +48,13 @@ nss_tlsd = executable('nss-tlsd',
 libnss_tls = shared_library('nss_tls', 'nss-tls.c', version: '2', install: true)
 
 cfg = configuration_data()
-cfg.set('prefix', get_option('prefix'))
-cfg.set('sbindir', get_option('sbindir'))
+cfg.set('nss_tlsd_path', nss_tlsd_path)
 nss_tlsd_service = configure_file(input: 'nss-tlsd.service.in',
                                   output: 'nss-tlsd.service',
                                   configuration: cfg)
-install_data(nss_tlsd_service, install_dir: join_paths(get_option('sysconfdir'), 'systemd', 'system'))
+install_data(nss_tlsd_service,
+             install_dir: join_paths(get_option('sysconfdir'),
+                                     'systemd',
+                                     'system'))
 
 install_man('nss-tlsd.8')

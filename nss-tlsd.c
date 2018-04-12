@@ -51,6 +51,11 @@ on_close (GObject       *source_object,
     struct nss_tls_query *query = (struct nss_tls_query *)user_data;
 
     g_io_stream_close_finish (G_IO_STREAM (source_object), res, NULL);
+
+    if (query->session) {
+        soup_session_abort (query->session);
+    }
+
     g_object_unref (query->connection);
     g_free (query);
 }
@@ -293,7 +298,13 @@ on_req (GObject         *source_object,
 
     g_debug ("Fetching %s", url);
 
-    query->session = soup_session_new ();
+    query->session = soup_session_new_with_options (SOUP_SESSION_TIMEOUT,
+                                                    NSS_TLS_TIMEOUT,
+                                                    SOUP_SESSION_IDLE_TIMEOUT,
+                                                    NSS_TLS_TIMEOUT,
+                                                    SOUP_SESSION_USER_AGENT,
+                                                    NSS_TLS_USER_AGENT,
+                                                    NULL);
     query->message = soup_message_new ("GET", url);
 
     soup_session_send_async (query->session,
