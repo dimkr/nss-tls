@@ -26,6 +26,12 @@ It performs encrypted name lookup over HTTPS through 1.1.1.1
 The name resolver can be configured through nsswitch.conf(5) to use nss-tls
 instead of the DNS resolver, or fall back to DNS when nss-tls fails.
 
+This way, all applications that use the standard resolver API (getaddrinfo(),
+gethostbyname(), etc'), are transparently migrated from DNS to encrypted means
+of name resolving, with zero application-side changes and minimal resource
+consumption footprint. However, nss-tls does not deal with applications that use
+their own, built-in DNS resolver.
+
 Architecture
 ============
 
