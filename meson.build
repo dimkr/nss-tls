@@ -47,14 +47,16 @@ nss_tlsd = executable('nss-tlsd',
 
 libnss_tls = shared_library('nss_tls', 'nss-tls.c', version: '2', install: true)
 
-cfg = configuration_data()
-cfg.set('nss_tlsd_path', nss_tlsd_path)
-nss_tlsd_service = configure_file(input: 'nss-tlsd.service.in',
-                                  output: 'nss-tlsd.service',
-                                  configuration: cfg)
-install_data(nss_tlsd_service,
-             install_dir: join_paths(get_option('sysconfdir'),
-                                     'systemd',
-                                     'system'))
+systemd = dependency('systemd', required: false)
+if systemd.found()
+    cfg = configuration_data()
+    cfg.set('nss_tlsd_path', nss_tlsd_path)
+    nss_tlsd_service = configure_file(input: 'nss-tlsd.service.in',
+                                      output: 'nss-tlsd.service',
+                                      configuration: cfg)
+
+    systemd_unit_dir = systemd.get_pkgconfig_variable('systemdsystemunitdir')
+    install_data(nss_tlsd_service, install_dir: systemd_unit_dir)
+endif
 
 install_man('nss-tlsd.8')
