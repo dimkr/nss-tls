@@ -404,12 +404,12 @@ int main(int argc, char **argv)
     g_unix_signal_add (SIGINT, on_term, loop);
     g_unix_signal_add (SIGTERM, on_term, loop);
 
-    g_main_loop_run(loop);
+    g_main_loop_run (loop);
 
-    g_main_loop_unref(loop);
-    g_object_unref(s);
+    g_main_loop_unref (loop);
+    g_object_unref (s);
     g_unlink (NSS_TLS_SOCKET);
-    g_object_unref(sa);
+    g_object_unref (sa);
 
     return EXIT_SUCCESS;
 }
