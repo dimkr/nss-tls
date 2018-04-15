@@ -277,6 +277,7 @@ on_req (GObject         *source_object,
         goto fail;
     }
 
+    query->req.name[sizeof (query->req.name) - 1] = '\0';
     g_debug ("Querying %s", query->req.name);
 
     switch (query->req.af) {
