@@ -32,6 +32,7 @@
 struct nss_tls_data {
     char *aliases[1];
     char *addrs[NSS_TLS_ADDRS_MAX];
+    struct nss_tls_req req;
     struct nss_tls_res res;
 };
 
@@ -44,7 +45,6 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
                                           int *h_errnop)
 {
     struct sockaddr_un sun = {.sun_family = AF_UNIX};
-    struct nss_tls_req req;
     struct timeval tv = {.tv_sec = NSS_TLS_TIMEOUT / 2, .tv_usec = 0};
     struct nss_tls_data *data = (struct nss_tls_data *)buf;
     ssize_t out;
@@ -81,10 +81,10 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
         return NSS_STATUS_TRYAGAIN;
     }
 
-    req.af = af;
-    strncpy(req.name, name, sizeof(req.name));
-    req.name[sizeof(req.name) - 1] = '\0';
-    if (send(s, &req, sizeof(req), 0) != sizeof(req)) {
+    data->req.af = af;
+    strncpy(data->req.name, name, sizeof(data->req.name));
+    data->req.name[sizeof(data->req.name) - 1] = '\0';
+    if (send(s, &data->req, sizeof(data->req), 0) != sizeof(data->req)) {
         close(s);
         return NSS_STATUS_TRYAGAIN;
     }
@@ -124,7 +124,7 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
 
     data->addrs[i] = NULL;
 
-    ret->h_name = NULL;
+    ret->h_name = data->req.name;
     data->aliases[0] = NULL;
     ret->h_aliases = data->aliases;
     ret->h_addrtype = af;
