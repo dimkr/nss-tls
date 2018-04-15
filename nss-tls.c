@@ -29,6 +29,12 @@
 
 #include "nss-tls.h"
 
+struct nss_tls_data {
+    char *aliases[1];
+    char *addrs[NSS_TLS_ADDRS_MAX];
+    struct nss_tls_res res;
+};
+
 enum nss_status _nss_tls_gethostbyname2_r(const char *name,
                                           int af,
                                           struct hostent *ret,
@@ -39,14 +45,13 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
 {
     struct sockaddr_un sun = {.sun_family = AF_UNIX};
     struct nss_tls_req req;
-    struct nss_tls_res res;
     struct timeval tv = {.tv_sec = NSS_TLS_TIMEOUT / 2, .tv_usec = 0};
-    char **aliases = (char **)buf;
-    char **addrs = (char **)(buf + sizeof(char **));
+    struct nss_tls_data *data = (struct nss_tls_data *)buf;
     ssize_t out;
     int s, i;
+    uint8_t count;
 
-    if (buflen < (sizeof(char *) * (sizeof(res.addrs) / sizeof(res.addrs[0]) + 1))) {
+    if (buflen < sizeof(*data)) {
         *errnop = ERANGE;
         return NSS_STATUS_TRYAGAIN;
     }
@@ -84,40 +89,46 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
         return NSS_STATUS_TRYAGAIN;
     }
 
-    out = recv(s, &res, sizeof(res), 0);
+    out = recv(s, &data->res, sizeof(data->res), 0);
     close(s);
 
     if (out == 0)
         return NSS_STATUS_NOTFOUND;
-    else if (out != sizeof(res))
+    else if (out != sizeof(data->res))
         return NSS_STATUS_TRYAGAIN;
+
+    count = data->res.count;
+    if (count == 0)
+        return NSS_STATUS_NOTFOUND;
+    if (count > NSS_TLS_ADDRS_MAX)
+        count = NSS_TLS_ADDRS_MAX;
 
     switch (af) {
     case AF_INET:
         ret->h_length = sizeof(struct in_addr);
 
-        for (i = 0; i < res.count; ++i)
-            addrs[i] = (char *)&res.addrs[i].in;
+        for (i = 0; i < count; ++i)
+            data->addrs[i] = (char *)&data->res.addrs[i].in;
         break;
 
     case AF_INET6:
         ret->h_length = sizeof(struct in6_addr);
 
-        for (i = 0; i < res.count; ++i)
-            addrs[i] = (char *)&res.addrs[i].in6;
+        for (i = 0; i < count; ++i)
+            data->addrs[i] = (char *)&data->res.addrs[i].in6;
         break;
 
     default:
         return NSS_STATUS_NOTFOUND;
     }
 
-    addrs[i] = NULL;
+    data->addrs[i] = NULL;
 
     ret->h_name = NULL;
-    aliases[0] = NULL;
-    ret->h_aliases = aliases;
+    data->aliases[0] = NULL;
+    ret->h_aliases = data->aliases;
     ret->h_addrtype = af;
-    ret->h_addr_list = addrs;
+    ret->h_addr_list = data->addrs;
 
     *errnop = 0;
     return NSS_STATUS_SUCCESS;
