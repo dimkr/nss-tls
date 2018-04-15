@@ -47,7 +47,7 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
     struct sockaddr_un sun = {.sun_family = AF_UNIX};
     struct timeval tv = {.tv_sec = NSS_TLS_TIMEOUT / 2, .tv_usec = 0};
     struct nss_tls_data *data = (struct nss_tls_data *)buf;
-    ssize_t out;
+    ssize_t out, total;
     int s, i;
     uint8_t count;
 
@@ -84,17 +84,35 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
     data->req.af = af;
     strncpy(data->req.name, name, sizeof(data->req.name));
     data->req.name[sizeof(data->req.name) - 1] = '\0';
-    if (send(s, &data->req, sizeof(data->req), 0) != sizeof(data->req)) {
-        close(s);
-        return NSS_STATUS_TRYAGAIN;
+    for (total = 0; total < sizeof(data->req); total += out) {
+        out = send(s,
+                   (unsigned char *)&data->req + total,
+                   sizeof(data->req) - total,
+                   0);
+        if (out <= 0) {
+            close(s);
+            return NSS_STATUS_TRYAGAIN;
+        }
     }
 
-    out = recv(s, &data->res, sizeof(data->res), 0);
+    for (total = 0; total < sizeof(data->res); total += out) {
+        out = recv(s,
+                   (unsigned char *)&data->res + total,
+                   sizeof(data->res) - total,
+                   0);
+        if (out < 0) {
+            close(s);
+            return NSS_STATUS_TRYAGAIN;
+        }
+        else if (out == 0)
+            break;
+    }
+
     close(s);
 
-    if (out == 0)
+    if (total == 0)
         return NSS_STATUS_NOTFOUND;
-    else if (out != sizeof(data->res))
+    else if (total != sizeof(data->res))
         return NSS_STATUS_TRYAGAIN;
 
     count = data->res.count;
