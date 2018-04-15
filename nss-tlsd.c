@@ -33,9 +33,9 @@
 
 #include "nss-tls.h"
 
-struct nss_tls_query {
-    struct nss_tls_req req;
-    struct nss_tls_res res;
+struct nss_tls_session {
+    struct nss_tls_req request;
+    struct nss_tls_res response;
     gint64 type;
     GSocketConnection *connection;
     SoupSession *session;
@@ -48,53 +48,54 @@ on_close (GObject       *source_object,
           GAsyncResult  *res,
           gpointer      user_data)
 {
-    struct nss_tls_query *query = (struct nss_tls_query *)user_data;
+    struct nss_tls_session *session = (struct nss_tls_session *)user_data;
 
     g_io_stream_close_finish (G_IO_STREAM (source_object), res, NULL);
 
-    if (query->session) {
-        soup_session_abort (query->session);
-        g_object_unref (query->session);
+    if (session->session) {
+        soup_session_abort (session->session);
+        g_object_unref (session->session);
     }
 
-    g_object_unref (query->connection);
-    g_free (query);
+    g_object_unref (session->connection);
+    g_free (session);
 }
 
 static
 void
-stop_query (struct nss_tls_query *query)
+stop_session (struct nss_tls_session *session)
 {
-    g_io_stream_close_async (G_IO_STREAM (query->connection),
+    g_io_stream_close_async (G_IO_STREAM (session->connection),
                              G_PRIORITY_DEFAULT,
                              NULL,
                              on_close,
-                             query);
+                             session);
 }
 
+/* step 4: we're done sending the response to libnss_tls */
 static
 void
-on_done (GObject         *source_object,
+on_sent (GObject         *source_object,
          GAsyncResult    *res,
          gpointer        user_data)
 {
-    struct nss_tls_query *query = (struct nss_tls_query *)user_data;
+    struct nss_tls_session *session = (struct nss_tls_session *)user_data;
     gsize out;
 
     if (g_output_stream_write_all_finish (G_OUTPUT_STREAM (source_object),
                                           res,
                                           &out,
                                           NULL) &&
-        (out == sizeof(query->res))) {
+        (out == sizeof (session->response))) {
         g_debug ("Done querying %s (%hhu results)",
-                 query->req.name,
-                 query->res.count);
+                 session->request.name,
+                 session->response.count);
     }
     else {
-        g_debug ("Failed to query %s", query->req.name);
+        g_debug ("Failed to query %s", session->request.name);
     }
 
-    stop_query (query);
+    stop_session (session);
 }
 
 static
@@ -104,59 +105,65 @@ on_answer (JsonArray    *array,
            JsonNode     *element_node,
            gpointer     user_data)
 {
-    struct nss_tls_query *query = (struct nss_tls_query *)user_data;
+    struct nss_tls_session *session = (struct nss_tls_session *)user_data;
     JsonObject *answero;
     const gchar *data;
-    void *dst = &query->res.addrs[query->res.count].in;
+    void *dst = &session->response.addrs[session->response.count].in;
     gint64 type;
 
-    if (query->res.count >=
-                       sizeof(query->res.addrs) / sizeof(query->res.addrs[0])) {
+    if (session->response.count >= NSS_TLS_ADDRS_MAX) {
         return;
     }
 
     answero = json_node_get_object (element_node);
 
     if (!json_object_has_member (answero, "type")) {
-        g_warning ("No type member for %s", query->req.name);
+        g_warning ("No type member for %s", session->request.name);
         return;
     }
 
     /* if the type doesn't match, it's OK - continue to the next answer */
     type = json_object_get_int_member (answero, "type");
-    if (type != query->type) {
+    if (type != session->type) {
         return;
     }
 
     if (!json_object_has_member (answero, "data")) {
-        g_debug ("No data for answer %u of %s", index_, query->req.name);
+        g_debug ("No data for answer %u of %s", index_, session->request.name);
         return;
     }
 
     data = json_object_get_string_member (answero, "data");
     if (!data) {
-        g_debug ("Invalid data for answer %u of %s", index_, query->req.name);
+        g_debug ("Invalid data for answer %u of %s",
+                 index_,
+                 session->request.name);
         return;
     }
 
-    if (query->req.af == AF_INET6) {
-        dst = &query->res.addrs[query->res.count].in6;
+    if (session->request.af == AF_INET6) {
+        dst = &session->response.addrs[session->response.count].in6;
     }
 
-    if (inet_pton (query->req.af, data, dst)) {
-        g_debug ("%s[%hhu] = %s", query->req.name, query->res.count, data);
-        ++query->res.count;
+    if (inet_pton (session->request.af, data, dst)) {
+        g_debug ("%s[%hhu] = %s",
+                 session->request.name,
+                 session->response.count,
+                 data);
+        ++session->response.count;
     }
 }
 
+/* step 3: we received the HTTPS response, parse it to construct our response
+ * and send it to libnss_tls */
 static
 void
-on_res (GObject         *source_object,
-        GAsyncResult    *res,
-        gpointer        user_data)
+on_response (GObject         *source_object,
+             GAsyncResult    *res,
+             gpointer        user_data)
 {
     GError *err = NULL;
-    struct nss_tls_query *query = (struct nss_tls_query *)user_data;
+    struct nss_tls_session *session = (struct nss_tls_session *)user_data;
     GInputStream *in;
     JsonParser *j = NULL;
     JsonNode *root;
@@ -169,12 +176,12 @@ on_res (GObject         *source_object,
                                    &err);
     if (!in) {
         if (err) {
-            g_warning ("Failed to query %s: %s",
-                       query->req.name,
+            g_warning ("Failed to session %s: %s",
+                       session->request.name,
                        err->message);
         }
         else {
-            g_warning ("Failed to query %s", query->req.name);
+            g_warning ("Failed to session %s", session->request.name);
         }
         goto cleanup;
     }
@@ -183,11 +190,12 @@ on_res (GObject         *source_object,
     if (!json_parser_load_from_stream (j, in, NULL, &err)) {
         if (err) {
             g_warning ("Failed to parse the result for %s: %s",
-                       query->req.name,
+                       session->request.name,
                        err->message);
         }
         else {
-            g_warning ("Failed to parse the result for %s", query->req.name);
+            g_warning ("Failed to parse the result for %s",
+                       session->request.name);
         }
         goto cleanup;
     }
@@ -195,28 +203,28 @@ on_res (GObject         *source_object,
     root = json_parser_get_root (j);
     rooto = json_node_get_object (root);
     if (!rooto) {
-        g_warning ("No root object for %s", query->req.name);
+        g_warning ("No root object for %s", session->request.name);
         goto cleanup;
     }
 
     if (!json_object_has_member (rooto, "Answer")) {
-        g_warning ("No Answer member for %s", query->req.name);
+        g_warning ("No Answer member for %s", session->request.name);
         goto cleanup;
     }
     answers = json_object_get_array_member (rooto, "Answer");
 
-    query->res.count = 0;
-    json_array_foreach_element (answers, on_answer, query);
+    session->response.count = 0;
+    json_array_foreach_element (answers, on_answer, session);
 
-    if (query->res.count > 0) {
-        out = g_io_stream_get_output_stream (G_IO_STREAM (query->connection));
+    if (session->response.count > 0) {
+        out = g_io_stream_get_output_stream (G_IO_STREAM (session->connection));
         g_output_stream_write_all_async (out,
-                                         &query->res,
-                                         sizeof(query->res),
+                                         &session->response,
+                                         sizeof (session->response),
                                          G_PRIORITY_DEFAULT,
                                          NULL,
-                                         on_done,
-                                         query);
+                                         on_sent,
+                                         session);
     }
 
 cleanup:
@@ -232,31 +240,36 @@ cleanup:
         g_object_unref (in);
     }
 
-    g_object_unref (query->message);
-    query->message = NULL;
+    g_object_unref (session->message);
+    session->message = NULL;
 
-    if (query->res.count == 0) {
-        stop_query (query);
+    if (session->response.count == 0) {
+        stop_session (session);
     }
     else {
-        g_object_unref (query->session);
-        query->session = NULL;
+        /* if we found any addresses, we close the session now instead of doing
+         * this in stop_session() once we're done sending passing the results to
+         * the client, to keep the number of open file descriptors as low as
+         * possible */
+        g_object_unref (session->session);
+        session->session = NULL;
     }
 }
 
+/* step 2: we received a request from libnss_tls and send a HTTPS request */
 static
 void
-on_req (GObject         *source_object,
-        GAsyncResult    *res,
-        gpointer        user_data)
+on_request (GObject         *source_object,
+            GAsyncResult    *res,
+            gpointer        user_data)
 {
     GError *err = NULL;
     gchar *url;
-    struct nss_tls_query *query = user_data;
+    struct nss_tls_session *session = user_data;
     gsize len;
 
-    query->session = NULL;
-    query->message = NULL;
+    session->session = NULL;
+    session->message = NULL;
 
     if (!g_input_stream_read_all_finish (G_INPUT_STREAM (source_object),
                                          res,
@@ -272,27 +285,27 @@ on_req (GObject         *source_object,
         goto fail;
     }
 
-    if (len != sizeof(query->req)) {
+    if (len != sizeof (session->request)) {
         g_debug ("Bad request");
         goto fail;
     }
 
-    query->req.name[sizeof (query->req.name) - 1] = '\0';
-    g_debug ("Querying %s", query->req.name);
+    session->request.name[sizeof (session->request.name) - 1] = '\0';
+    g_debug ("Querying %s", session->request.name);
 
-    switch (query->req.af) {
+    switch (session->request.af) {
     case AF_INET:
         /* A */
-        query->type = 1;
-        url = g_strdup_printf ("https://"NSS_TLS_RESOLVER"/dns-query?ct=application/dns-json&name=%s&type=A",
-                               query->req.name);
+        session->type = 1;
+        url = g_strdup_printf ("https://"NSS_TLS_RESOLVER"/dns-session?ct=application/dns-json&name=%s&type=A",
+                               session->request.name);
         break;
 
     case AF_INET6:
         /* AAAA */
-        query->type = 28;
-        url = g_strdup_printf ("https://"NSS_TLS_RESOLVER"/dns-query?ct=application/dns-json&name=%s&type=AAAA",
-                               query->req.name);
+        session->type = 28;
+        url = g_strdup_printf ("https://"NSS_TLS_RESOLVER"/dns-session?ct=application/dns-json&name=%s&type=AAAA",
+                               session->request.name);
         break;
 
     default:
@@ -301,52 +314,57 @@ on_req (GObject         *source_object,
 
     g_debug ("Fetching %s", url);
 
-    query->session = soup_session_new_with_options (SOUP_SESSION_TIMEOUT,
-                                                    NSS_TLS_TIMEOUT,
-                                                    SOUP_SESSION_IDLE_TIMEOUT,
-                                                    NSS_TLS_TIMEOUT,
-                                                    SOUP_SESSION_USER_AGENT,
-                                                    NSS_TLS_USER_AGENT,
-                                                    NULL);
-    query->message = soup_message_new ("GET", url);
+    session->session = soup_session_new_with_options (SOUP_SESSION_TIMEOUT,
+                                                      NSS_TLS_TIMEOUT,
+                                                      SOUP_SESSION_IDLE_TIMEOUT,
+                                                      NSS_TLS_TIMEOUT,
+                                                      SOUP_SESSION_USER_AGENT,
+                                                      NSS_TLS_USER_AGENT,
+                                                      NULL);
+    session->message = soup_message_new ("GET", url);
 
-    soup_session_send_async (query->session,
-                             query->message,
+    soup_session_send_async (session->session,
+                             session->message,
                              NULL,
-                             on_res,
-                             query);
+                             on_response,
+                             session);
     g_free (url);
 
     return;
 
 fail:
-    stop_query (query);
+    stop_session (session);
 }
 
-static void
-on_incoming (GSocketService     *service,
-             GSocketConnection  *connection,
-             GObject            *source_object,
-             gpointer           user_data)
+/* step 1: we accept a new connection from libnss_tls and wait for it to send a
+ * request */
+static
+void
+on_connection (GSocketService     *service,
+               GSocketConnection  *connection,
+               GObject            *source_object,
+               gpointer           user_data)
 {
     GSocket *s;
-    struct nss_tls_query *query;
+    struct nss_tls_session *session;
     GInputStream *in;
 
+    /* we disconnect the client after NSS_TLS_TIMEOUT seconds */
     s = g_socket_connection_get_socket (connection);
     g_socket_set_timeout (s, NSS_TLS_TIMEOUT);
 
-    query = g_new0 (struct nss_tls_query, 1);
-    query->connection = g_object_ref (connection);
+    session = g_new0 (struct nss_tls_session, 1);
+    session->connection = g_object_ref (connection);
 
     in = g_io_stream_get_input_stream (G_IO_STREAM (connection));
+    /* read the incoming request */
     g_input_stream_read_all_async (in,
-                                   &query->req,
-                                   sizeof(query->req),
+                                   &session->request,
+                                   sizeof (session->request),
                                    G_PRIORITY_DEFAULT,
                                    NULL,
-                                   on_req,
-                                   query);
+                                   on_request,
+                                   session);
 }
 
 static
@@ -378,7 +396,7 @@ int main(int argc, char **argv)
 
     g_signal_connect (s,
                       "incoming",
-                      G_CALLBACK (on_incoming),
+                      G_CALLBACK (on_connection),
                       NULL);
     g_socket_service_start (s);
     g_chmod (NSS_TLS_SOCKET , 0666);
