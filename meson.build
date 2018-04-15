@@ -36,7 +36,7 @@ add_project_arguments(
 nss_tlsd = executable('nss-tlsd',
                       'nss-tlsd.c',
                       dependencies: [
-                          dependency('glib-2.0'),
+                          dependency('glib-2.0', version: '>=2.44'),
                           dependency('gio-2.0'),
                           dependency('gio-unix-2.0'),
                           dependency('json-glib-1.0'),
