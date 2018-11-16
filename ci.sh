@@ -22,12 +22,15 @@ meson --prefix=/usr --buildtype=release -Dstrip=true -Dresolver=1.1.1.1 build
 ninja -C build install
 
 ldconfig
+cp -f /etc/nsswitch.conf /tmp/
 sed 's/hosts:.*/hosts: files tls/' -i /etc/nsswitch.conf
 nss-tlsd &
 sleep 1
 
 getent hosts youtube.com
 getent hosts github.com
+
+cp -f /tmp/nsswitch.conf /etc/
 
 apt install -y unzip firefox
 pip3 install selenium
@@ -45,12 +48,13 @@ tar -xzf geckodriver-v0.23.0-linux64.tar.gz
 
 mkdir -p dl
 
-
 for i in firefox-*.tar.*
 do
     d=${i%*.tar*}
     mkdir $d
     tar -xjf $i -C $d
 done
+
+sed 's/hosts:.*/hosts: files tls/' -i /etc/nsswitch.conf
 
 PATH=$PATH:`pwd` ./ci.py
