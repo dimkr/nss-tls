@@ -18,7 +18,7 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-meson --prefix=/usr --buildtype=release -Dstrip=true build
+meson --prefix=/usr --buildtype=release -Dstrip=true -Dresolver=1.1.1.1 build
 ninja -C build install
 
 ldconfig
