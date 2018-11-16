@@ -4,4 +4,8 @@ services:
   - docker
 
 script:
-  - docker run -e CI -w /root/nss-tls -v `pwd`:/root/nss-tls dimkr/c-dev:latest ./ci.sh
+  - docker run -e CI -w /root/nss-tls -v `pwd`:/root/nss-tls dimkr/nss-tls:latest ./ci.sh
+
+cache:
+  directories:
+    - dl

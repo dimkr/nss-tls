@@ -22,6 +22,7 @@ from selenium import webdriver
 from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
 from selenium.webdriver.firefox.options import Options
 import os
+import unittest
 
 SITES = ("youtube.com",)
 
@@ -29,10 +30,26 @@ opts = Options()
 if os.getenv("CI"):
     opts.add_argument("-headless")
 
-for binary in [FirefoxBinary("/usr/bin/firefox")] + [FirefoxBinary("%s/firefox/firefox" % x) for x in os.listdir('.') if x.startswith("firefox-") and os.path.isdir(x)]:
-    with webdriver.Firefox(firefox_binary=binary, firefox_options=opts) as ff:
-        for i in SITES:
-            for j in ("http", "https"):
-                url = "%s://%s/" % (j, i)
-                ff.get(url)
-                assert i in ff.current_url
+class FirefoxTest(unittest.TestCase):
+    path = "/usr/bin/firefox"
+
+    def setUp(self):
+        self.driver = webdriver.Firefox(firefox_binary=FirefoxBinary(self.path), options=opts)
+
+    def tearDown(self):
+        self.driver.quit()
+
+    def _test_proto(self, proto):
+        for s in SITES:
+            url = "%s://%s" % (proto, s)
+            self.driver.get(url)
+            assert s in self.driver.current_url
+
+    def test_http(self):
+        self._test_proto("http")
+
+    def test_https(self):
+        self._test_proto("https")
+
+if __name__ == "__main__":
+    unittest.main()
