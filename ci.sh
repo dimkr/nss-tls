@@ -27,13 +27,15 @@ sed 's/hosts:.*/hosts: files tls/' -i /etc/nsswitch.conf
 nss-tlsd &
 sleep 1
 
-getent hosts youtube.com
-getent hosts github.com
+getent hosts travis-ci.org
 
 cp -f /tmp/nsswitch.conf /etc/
 
 apt install -y unzip firefox
 pip3 install selenium
+
+mkdir -p dl
+cd dl
 
 (
     echo https://github.com/mozilla/geckodriver/releases/download/v0.23.0/geckodriver-v0.23.0-linux64.tar.gz
@@ -44,16 +46,16 @@ pip3 install selenium
     done
 ) | aria2c -x4 -ctrue -i-
 
-tar -xzf geckodriver-v0.23.0-linux64.tar.gz
-
-mkdir -p dl
+tar -xz -C .. -f dl/geckodriver-v0.23.0-linux64.tar.gz
 
 for i in firefox-*.tar.*
 do
     d=${i%*.tar*}
-    mkdir $d
-    tar -xjf $i -C $d
+    mkdir ../$d
+    tar -xj -f $i -C ../$d
 done
+
+cd ..
 
 sed 's/hosts:.*/hosts: files tls/' -i /etc/nsswitch.conf
 
