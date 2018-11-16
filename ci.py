@@ -30,12 +30,7 @@ if os.getenv("CI"):
     opts.add_argument("-headless")
 
 for binary in [FirefoxBinary("/usr/bin/firefox")] + [FirefoxBinary("%s/firefox/firefox" % x) for x in os.listdir('.') if x.startswith("firefox-") and os.path.isdir(x)]:
-    prof = webdriver.FirefoxProfile()
-    # disable DoH
-    prof.set_preference("network.trr.mode", 5)
-    prof.update_preferences()
-
-    with webdriver.Firefox(firefox_binary=binary, firefox_options=opts, firefox_profile=prof) as ff:
+    with webdriver.Firefox(firefox_binary=binary, firefox_options=opts) as ff:
         for i in SITES:
             for j in ("http", "https"):
                 url = "%s://%s/" % (j, i)
