@@ -23,7 +23,7 @@ from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
 from selenium.webdriver.firefox.options import Options
 import os
 
-SITES = ("travis-ci.org",)
+SITES = ("youtube.com",)
 
 opts = Options()
 if os.getenv("CI"):

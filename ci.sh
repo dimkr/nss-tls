@@ -27,7 +27,7 @@ sed 's/hosts:.*/hosts: files tls/' -i /etc/nsswitch.conf
 nss-tlsd &
 sleep 1
 
-getent hosts travis-ci.org
+getent hosts youtube.com
 
 cp -f /tmp/nsswitch.conf /etc/
 
