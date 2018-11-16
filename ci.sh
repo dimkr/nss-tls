@@ -21,6 +21,14 @@
 meson --prefix=/usr --buildtype=release -Dstrip=true build
 ninja -C build install
 
+ldconfig
+sed 's/hosts:.*/hosts: files tls/' -i /etc/nsswitch.conf
+nss-tlsd &
+sleep 1
+
+getent hosts youtube.com
+getent hosts github.com
+
 apt install -y unzip firefox
 pip3 install selenium
 
@@ -44,10 +52,5 @@ do
     mkdir $d
     tar -xjf $i -C $d
 done
-
-ldconfig
-sed 's/hosts:.*/hosts: files tls/' -i /etc/nsswitch.conf
-nss-tlsd &
-sleep 1
 
 PATH=$PATH:`pwd` ./ci.py
