@@ -46,7 +46,7 @@ cd dl
     done
 ) | aria2c -x4 -ctrue -i-
 
-tar -xz -C .. -f dl/geckodriver-v0.23.0-linux64.tar.gz
+tar -xz -C .. -f geckodriver-v0.23.0-linux64.tar.gz
 
 for i in firefox-*.tar.*
 do
