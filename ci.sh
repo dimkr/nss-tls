@@ -19,4 +19,35 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 meson --prefix=/usr --buildtype=release -Dstrip=true build
-DESTDIR=`mktemp -d` ninja -C build install
+ninja -C build install
+
+apt install -y unzip
+pip3 install selenium
+
+(
+    echo https://github.com/mozilla/geckodriver/releases/download/v0.23.0/geckodriver-v0.23.0-linux64.tar.gz
+
+    for i in -esr "" -beta -nightly
+    do
+        echo "https://download.mozilla.org/?product=firefox${i}-latest-ssl&os=linux64&lang=en-US"
+    done
+) | aria2c -x4 -ctrue -i-
+
+tar -xzf geckodriver-v0.23.0-linux64.tar.gz
+
+mkdir -p dl
+
+
+for i in firefox-*.tar.*
+do
+    d=${i%*.tar*}
+    mkdir $d
+    tar -xjf $i -C $d
+done
+
+ldconfig
+sed 's/hosts:.*/hosts: files tls/' -i /etc/nsswitch.conf
+nss-tlsd &
+sleep 1
+
+PATH=$PATH:`pwd` ./ci.py
