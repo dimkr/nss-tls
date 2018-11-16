@@ -21,7 +21,7 @@
 meson --prefix=/usr --buildtype=release -Dstrip=true build
 ninja -C build install
 
-apt install -y unzip
+apt install -y unzip firefox
 pip3 install selenium
 
 (
