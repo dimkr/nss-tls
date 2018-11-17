@@ -21,14 +21,10 @@
 meson --prefix=/usr --buildtype=release -Dstrip=true -Dresolver=1.1.1.1 build
 ninja -C build install
 
-mkdir -p dl
-[ ! -f dl/geckodriver-v0.23.0-linux64.tar.gz ] && aria2c -x4 -odl/geckodriver-v0.23.0-linux64.tar.gz https://github.com/mozilla/geckodriver/releases/download/v0.23.0/geckodriver-v0.23.0-linux64.tar.gz
-tar -xzf dl/geckodriver-v0.23.0-linux64.tar.gz
-
 ldconfig
 cp -f /etc/nsswitch.conf /tmp/
 sed 's/hosts:.*/hosts: files tls/' -i /etc/nsswitch.conf
 nss-tlsd &
 sleep 1
 
-PATH=$PATH:`pwd` py.test ci.py -v -nauto
+py.test ci.py -v -nauto
