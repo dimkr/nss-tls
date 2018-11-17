@@ -1,5 +1,3 @@
-#!/bin/sh -xe
-
 # This file is part of nss-tls.
 #
 # Copyright (C) 2018  Dima Krasner
@@ -18,17 +16,7 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-meson --prefix=/usr --buildtype=release -Dstrip=true -Dresolver=1.1.1.1 build
-ninja -C build install
+FROM dimkr/c-dev
 
-mkdir -p dl
-[ ! -f dl/geckodriver-v0.23.0-linux64.tar.gz ] && aria2c -x4 -odl/geckodriver-v0.23.0-linux64.tar.gz https://github.com/mozilla/geckodriver/releases/download/v0.23.0/geckodriver-v0.23.0-linux64.tar.gz
-tar -xzf dl/geckodriver-v0.23.0-linux64.tar.gz
-
-ldconfig
-cp -f /etc/nsswitch.conf /tmp/
-sed 's/hosts:.*/hosts: files tls/' -i /etc/nsswitch.conf
-nss-tlsd &
-sleep 1
-
-PATH=$PATH:`pwd` py.test ci.py -v -nauto
+RUN apt-get -qq update && apt-get -y --no-install-recommends install libglib2.0-dev libsoup2.4-dev libjson-glib-dev systemd unzip firefox && apt-get autoremove --purge && apt-get autoclean
+RUN pip3 install selenium pytest pytest-xdist
