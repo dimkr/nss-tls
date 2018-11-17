@@ -25,6 +25,7 @@ import os
 import unittest
 
 SITES = ("youtube.com",)
+PROTOS = ("http", "https")
 
 opts = Options()
 if os.getenv("CI"):
@@ -39,17 +40,12 @@ class FirefoxTest(unittest.TestCase):
     def tearDown(self):
         self.driver.quit()
 
-    def _test_proto(self, proto):
+    def test_sanity(self, proto):
         for s in SITES:
-            url = "%s://%s" % (proto, s)
-            self.driver.get(url)
-            assert s in self.driver.current_url
-
-    def test_http(self):
-        self._test_proto("http")
-
-    def test_https(self):
-        self._test_proto("https")
+            for p in PROTOS:
+                url = "%s://%s" % (p, s)
+                self.driver.get(url)
+                assert s in self.driver.current_url
 
 if __name__ == "__main__":
     unittest.main()
