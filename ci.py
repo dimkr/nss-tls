@@ -40,7 +40,7 @@ class FirefoxTest(unittest.TestCase):
     def tearDown(self):
         self.driver.quit()
 
-    def test_sanity(self, proto):
+    def test_sanity(self):
         for s in SITES:
             for p in PROTOS:
                 url = "%s://%s" % (p, s)
