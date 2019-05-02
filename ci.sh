@@ -2,7 +2,7 @@
 
 # This file is part of nss-tls.
 #
-# Copyright (C) 2018  Dima Krasner
+# Copyright (C) 2018, 2019  Dima Krasner
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
