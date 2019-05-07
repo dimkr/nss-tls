@@ -88,7 +88,7 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
         out = send(s,
                    (unsigned char *)&data->req + total,
                    sizeof(data->req) - total,
-                   0);
+                   MSG_NOSIGNAL);
         if (out <= 0) {
             close(s);
             return NSS_STATUS_TRYAGAIN;
