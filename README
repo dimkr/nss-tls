@@ -20,11 +20,8 @@ nss-tls is an alternative name resolving library for Linux
 (http://www.kernel.org/) distributions with glibc
 (https://www.gnu.org/software/libc/).
 
-It performs encrypted name lookup over HTTPS through 1.1.1.1
-(https://developers.cloudflare.com/1.1.1.1/dns-over-https/).
-
-The name resolver can be configured through nsswitch.conf(5) to use nss-tls
-instead of the DNS resolver, or fall back to DNS when nss-tls fails.
+The glibc name resolver can be configured through nsswitch.conf(5) to use
+nss-tls instead of the DNS resolver, or fall back to DNS when nss-tls fails.
 
 This way, all applications that use the standard resolver API (getaddrinfo(),
 gethostbyname(), etc'), are transparently migrated from DNS to encrypted means
@@ -80,6 +77,16 @@ Assuming your system runs systemd
   7) Add "tls" to the "hosts" entry in /etc/nsswitch.conf, before "dns" or
      anything else that contains "dns" in its name
 
+Choosing a DoH Server
+=====================
+
+By default, nss-tls performs encrypted name lookup over HTTPS through 1.1.1.1
+(https://developers.cloudflare.com/1.1.1.1/dns-over-https/).
+
+To use a different DNS over HTTPS (DoH) server, use the "resolver" build option:
+
+  meson configure -Dresolver=dns9.quad9.net
+
 Performance
 ===========
 
@@ -101,7 +108,7 @@ Lesser General Public License as published by the Free Software Foundation;
 either version 2.1 of the License, or (at your option) any later version
 license.
 
-nss-tls is not affiliated with 1.1.1.1 or
-Cloudflare (https://www.cloudflare.com/).
+nss-tls is not affiliated with 1.1.1.1, Cloudflare (https://www.cloudflare.com/)
+or Quad9 (https://www.quad9.net/).
 
 The ASCII art logo at the top was made using FIGlet (http://www.figlet.org/).
