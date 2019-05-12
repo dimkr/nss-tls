@@ -292,7 +292,7 @@ on_response (GObject         *source_object,
 
     json_array_foreach_element (answers, on_answer, session);
 
-    if (session->cname && (session->response.count < NSS_TLS_ADDRS_MAX)) {
+    if (session->cname && (session->response.count == 0)) {
         resolve_cname (session);
         return;
     } else if (session->response.count > 0) {
