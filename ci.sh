@@ -28,6 +28,7 @@ ldconfig
 cp -f /etc/nsswitch.conf /tmp/
 sed 's/hosts:.*/hosts: files tls/' -i /etc/nsswitch.conf
 G_MESSAGES_DEBUG=all ./build-asan/nss-tlsd &
+pid=$!
 sleep 1
 
 getent hosts ipv4.google.com
@@ -35,4 +36,5 @@ getent hosts ipv6.google.com
 
 py.test ci.py -v -nauto
 
-killall nss-tlsd
+kill $pid
+sleep 1
