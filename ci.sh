@@ -21,7 +21,7 @@
 CC=gcc-8 meson --prefix=/usr --buildtype=release -Dstrip=true build
 ninja -C build install
 
-CC=clang-8 meson --prefix=/usr -Dstrip=true -Dresolver=1.1.1.1/dns-query -Db_sanitize=address build-asan
+CC=clang-8 meson --prefix=/usr -Dresolver=1.1.1.1/dns-query -Db_sanitize=address build-asan
 ninja -C build-asan nss-tlsd
 
 ldconfig
