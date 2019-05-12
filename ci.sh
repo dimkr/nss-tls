@@ -18,16 +18,16 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-CC=gcc-8 meson --buildtype=release build
-ninja -C build
+CC=gcc-8 meson --prefix=/usr --buildtype=release -Dstrip=true build
+ninja -C build install
 
 CC=clang-8 meson --prefix=/usr --buildtype=release -Dstrip=true -Dresolver=1.1.1.1/dns-query -Db_sanitize=address build-asan
-ninja -C build-asan install
+ninja -C build-asan nss-tlsd
 
 ldconfig
 cp -f /etc/nsswitch.conf /tmp/
 sed 's/hosts:.*/hosts: files tls/' -i /etc/nsswitch.conf
-G_MESSAGES_DEBUG=all nss-tlsd &
+G_MESSAGES_DEBUG=all ./build-asan/nss-tlsd &
 sleep 1
 
 py.test ci.py -v -nauto
