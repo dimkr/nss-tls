@@ -24,7 +24,7 @@ ninja -C build install
 ldconfig
 cp -f /etc/nsswitch.conf /tmp/
 sed 's/hosts:.*/hosts: files tls/' -i /etc/nsswitch.conf
-nss-tlsd &
+G_MESSAGES_DEBUG=all nss-tlsd &
 sleep 1
 
 py.test ci.py -v -nauto
