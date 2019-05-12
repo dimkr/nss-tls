@@ -85,7 +85,7 @@ By default, nss-tls performs encrypted name lookup over HTTPS through 1.1.1.1
 
 To use a different DNS over HTTPS (DoH) server, use the "resolver" build option:
 
-  meson configure -Dresolver=dns9.quad9.net
+  meson configure -Dresolver=dns9.quad9.net/dns-query
 
 Performance
 ===========

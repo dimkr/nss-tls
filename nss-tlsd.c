@@ -59,14 +59,14 @@ resolve_domain (struct nss_tls_session *session)
     case AF_INET:
         /* A */
         session->type = 1;
-        url = g_strdup_printf ("https://"NSS_TLS_RESOLVER"/dns-query?ct=application/dns-json&name=%s&type=A",
+        url = g_strdup_printf ("https://"NSS_TLS_RESOLVER"?ct=application/dns-json&name=%s&type=A",
                                session->request.name);
         break;
 
     case AF_INET6:
         /* AAAA */
         session->type = 28;
-        url = g_strdup_printf ("https://"NSS_TLS_RESOLVER"/dns-query?ct=application/dns-json&name=%s&type=AAAA",
+        url = g_strdup_printf ("https://"NSS_TLS_RESOLVER"?ct=application/dns-json&name=%s&type=AAAA",
                                session->request.name);
         break;
 
