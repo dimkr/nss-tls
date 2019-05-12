@@ -30,4 +30,7 @@ sed 's/hosts:.*/hosts: files tls/' -i /etc/nsswitch.conf
 G_MESSAGES_DEBUG=all ./build-asan/nss-tlsd &
 sleep 1
 
+getent hosts ipv4.google.com
+getent hosts ipv6.google.com
+
 py.test ci.py -v -nauto
