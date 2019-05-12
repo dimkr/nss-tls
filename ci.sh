@@ -18,8 +18,11 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-CC=gcc-8 meson --prefix=/usr --buildtype=release -Dstrip=true -Dresolver=1.1.1.1/dns-query build
-ninja -C build install
+CC=gcc-8 meson --buildtype=release build
+ninja -C build
+
+CC=clang-8 meson --prefix=/usr --buildtype=release -Dstrip=true -Dresolver=1.1.1.1/dns-query -Db_sanitize=address build-asan
+ninja -C build-asan install
 
 ldconfig
 cp -f /etc/nsswitch.conf /tmp/
