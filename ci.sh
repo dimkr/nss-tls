@@ -34,3 +34,5 @@ getent hosts ipv4.google.com
 getent hosts ipv6.google.com
 
 py.test ci.py -v -nauto
+
+killall nss-tlsd
