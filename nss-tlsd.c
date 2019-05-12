@@ -1,6 +1,6 @@
 /* This file is part of nss-tls.
  *
- * Copyright (C) 2018  Dima Krasner
+ * Copyright (C) 2018, 2019  Dima Krasner
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -37,10 +37,77 @@ struct nss_tls_session {
     struct nss_tls_req request;
     struct nss_tls_res response;
     gint64 type;
+    gchar *cname;
     GSocketConnection *connection;
     SoupSession *session;
     SoupMessage *message;
 };
+
+static
+void
+on_response (GObject         *source_object,
+             GAsyncResult    *res,
+             gpointer        user_data);
+
+static
+gboolean
+resolve_domain (struct nss_tls_session *session)
+{
+    gchar *url;
+
+    switch (session->request.af) {
+    case AF_INET:
+        /* A */
+        session->type = 1;
+        url = g_strdup_printf ("https://"NSS_TLS_RESOLVER"/dns-query?ct=application/dns-json&name=%s&type=A",
+                               session->request.name);
+        break;
+
+    case AF_INET6:
+        /* AAAA */
+        session->type = 28;
+        url = g_strdup_printf ("https://"NSS_TLS_RESOLVER"/dns-query?ct=application/dns-json&name=%s&type=AAAA",
+                               session->request.name);
+        break;
+
+    default:
+        return FALSE;
+    }
+
+    g_debug ("Fetching %s", url);
+
+    session->session = soup_session_new_with_options (SOUP_SESSION_TIMEOUT,
+                                                      NSS_TLS_TIMEOUT,
+                                                      SOUP_SESSION_IDLE_TIMEOUT,
+                                                      NSS_TLS_TIMEOUT,
+                                                      SOUP_SESSION_USER_AGENT,
+                                                      NSS_TLS_USER_AGENT,
+                                                      NULL);
+    session->message = soup_message_new ("GET", url);
+
+    soup_session_send_async (session->session,
+                             session->message,
+                             NULL,
+                             on_response,
+                             session);
+    g_free (url);
+
+    return TRUE;
+}
+
+static
+void
+resolve_cname (struct nss_tls_session *session)
+{
+    session->session = NULL;
+    session->message = NULL;
+
+    g_strlcpy (session->request.name, session->cname, sizeof (session->request.name));
+    g_free (session->cname);
+    session->cname = NULL;
+
+    resolve_domain (session);
+}
 
 static
 void
@@ -57,7 +124,10 @@ on_close (GObject       *source_object,
         g_object_unref (session->session);
     }
 
+    g_free (session->cname);
+
     g_object_unref (session->connection);
+
     g_free (session);
 }
 
@@ -107,7 +177,7 @@ on_answer (JsonArray    *array,
 {
     struct nss_tls_session *session = (struct nss_tls_session *)user_data;
     JsonObject *answero;
-    const gchar *data;
+    const gchar *data, *cname;
     void *dst = &session->response.addrs[session->response.count].in;
     gint64 type;
 
@@ -125,6 +195,13 @@ on_answer (JsonArray    *array,
     /* if the type doesn't match, it's OK - continue to the next answer */
     type = json_object_get_int_member (answero, "type");
     if (type != session->type) {
+        if (type == 5) {
+            cname = json_object_get_string_member (answero, "data");
+            if (cname && strcmp(cname, session->request.name)) {
+                g_debug ("The canonical name of %s is %s", session->request.name, cname);
+                session->cname = g_strdup (cname);
+            }
+        }
         return;
     }
 
@@ -213,10 +290,12 @@ on_response (GObject         *source_object,
     }
     answers = json_object_get_array_member (rooto, "Answer");
 
-    session->response.count = 0;
     json_array_foreach_element (answers, on_answer, session);
 
-    if (session->response.count > 0) {
+    if (session->cname && (session->response.count < NSS_TLS_ADDRS_MAX)) {
+        resolve_cname (session);
+        return;
+    } else if (session->response.count > 0) {
         out = g_io_stream_get_output_stream (G_IO_STREAM (session->connection));
         g_output_stream_write_all_async (out,
                                          &session->response,
@@ -225,6 +304,7 @@ on_response (GObject         *source_object,
                                          NULL,
                                          on_sent,
                                          session);
+        return;
     }
 
 cleanup:
@@ -264,12 +344,12 @@ on_request (GObject         *source_object,
             gpointer        user_data)
 {
     GError *err = NULL;
-    gchar *url;
     struct nss_tls_session *session = user_data;
     gsize len;
 
     session->session = NULL;
     session->message = NULL;
+    session->cname = NULL;
 
     if (!g_input_stream_read_all_finish (G_INPUT_STREAM (source_object),
                                          res,
@@ -291,46 +371,10 @@ on_request (GObject         *source_object,
     }
 
     session->request.name[sizeof (session->request.name) - 1] = '\0';
-    g_debug ("Querying %s", session->request.name);
 
-    switch (session->request.af) {
-    case AF_INET:
-        /* A */
-        session->type = 1;
-        url = g_strdup_printf ("https://"NSS_TLS_RESOLVER"/dns-query?ct=application/dns-json&name=%s&type=A",
-                               session->request.name);
-        break;
-
-    case AF_INET6:
-        /* AAAA */
-        session->type = 28;
-        url = g_strdup_printf ("https://"NSS_TLS_RESOLVER"/dns-query?ct=application/dns-json&name=%s&type=AAAA",
-                               session->request.name);
-        break;
-
-    default:
-        goto fail;
+    if (resolve_domain (session)) {
+        return;
     }
-
-    g_debug ("Fetching %s", url);
-
-    session->session = soup_session_new_with_options (SOUP_SESSION_TIMEOUT,
-                                                      NSS_TLS_TIMEOUT,
-                                                      SOUP_SESSION_IDLE_TIMEOUT,
-                                                      NSS_TLS_TIMEOUT,
-                                                      SOUP_SESSION_USER_AGENT,
-                                                      NSS_TLS_USER_AGENT,
-                                                      NULL);
-    session->message = soup_message_new ("GET", url);
-
-    soup_session_send_async (session->session,
-                             session->message,
-                             NULL,
-                             on_response,
-                             session);
-    g_free (url);
-
-    return;
 
 fail:
     stop_session (session);
@@ -355,6 +399,7 @@ on_connection (GSocketService     *service,
 
     session = g_new0 (struct nss_tls_session, 1);
     session->connection = g_object_ref (connection);
+    session->response.count = 0;
 
     in = g_io_stream_get_input_stream (G_IO_STREAM (connection));
     /* read the incoming request */
