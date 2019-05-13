@@ -31,6 +31,9 @@ G_MESSAGES_DEBUG=all ./build-asan/nss-tlsd &
 pid=$!
 sleep 1
 
+tlslookup ipv4.google.com
+tlslookup ipv6.google.com
+
 getent hosts ipv4.google.com
 getent hosts ipv6.google.com
 

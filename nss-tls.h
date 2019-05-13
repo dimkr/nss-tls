@@ -1,6 +1,6 @@
 /* This file is part of nss-tls.
  *
- * Copyright (C) 2018  Dima Krasner
+ * Copyright (C) 2018, 2019  Dima Krasner
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -34,3 +34,10 @@ struct nss_tls_res {
         struct in6_addr in6;
     } addrs[NSS_TLS_ADDRS_MAX];
 } __attribute__((packed));
+
+struct nss_tls_data {
+    char *aliases[1];
+    char *addrs[NSS_TLS_ADDRS_MAX + 1];
+    struct nss_tls_req req;
+    struct nss_tls_res res;
+};

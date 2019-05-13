@@ -47,6 +47,11 @@ nss_tlsd = executable('nss-tlsd',
 
 libnss_tls = shared_library('nss_tls', 'nss-tls.c', version: '2', install: true)
 
+tlslookup = executable('tlslookup',
+                       'tlslookup.c',
+                       link_with: libnss_tls,
+                       install: true)
+
 systemd = dependency('systemd', required: false)
 if systemd.found()
     cfg = configuration_data()

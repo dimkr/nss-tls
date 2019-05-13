@@ -1,6 +1,6 @@
 /* This file is part of nss-tls.
  *
- * Copyright (C) 2018  Dima Krasner
+ * Copyright (C) 2018, 2019  Dima Krasner
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -28,13 +28,6 @@
 #include <nss.h>
 
 #include "nss-tls.h"
-
-struct nss_tls_data {
-    char *aliases[1];
-    char *addrs[NSS_TLS_ADDRS_MAX];
-    struct nss_tls_req req;
-    struct nss_tls_res res;
-};
 
 enum nss_status _nss_tls_gethostbyname2_r(const char *name,
                                           int af,
@@ -124,22 +117,18 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
     switch (af) {
     case AF_INET:
         ret->h_length = sizeof(struct in_addr);
-
-        for (i = 0; i < count; ++i)
-            data->addrs[i] = (char *)&data->res.addrs[i].in;
         break;
 
     case AF_INET6:
         ret->h_length = sizeof(struct in6_addr);
-
-        for (i = 0; i < count; ++i)
-            data->addrs[i] = (char *)&data->res.addrs[i].in6;
         break;
 
     default:
         return NSS_STATUS_NOTFOUND;
     }
 
+    for (i = 0; i < count; ++i)
+        data->addrs[i] = (char *)&data->res.addrs[i];
     data->addrs[i] = NULL;
 
     ret->h_name = data->req.name;
