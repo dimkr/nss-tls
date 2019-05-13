@@ -33,9 +33,11 @@ sleep 1
 
 tlslookup ipv4.google.com
 tlslookup ipv6.google.com
+tlslookup google.com
 
 getent hosts ipv4.google.com
 getent hosts ipv6.google.com
+getent hosts google.com
 
 py.test ci.py -v -nauto
 
