@@ -1,4 +1,5 @@
-/* This file is part of nss-tls.
+/*
+ * This file is part of nss-tls.
  *
  * Copyright (C) 2018, 2019  Dima Krasner
  *
