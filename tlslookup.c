@@ -20,6 +20,7 @@
 
 #include <stdlib.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
 #include <netdb.h>
 #include <nss.h>
 #include <stdio.h>
@@ -33,6 +34,7 @@ extern enum nss_status _nss_tls_gethostbyname2_r(const char *name,
                                                  size_t buflen,
                                                  int *errnop,
                                                  int *h_errnop);
+
 int main(int argc, char *argv[])
 {
     struct nss_tls_data data;
