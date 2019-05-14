@@ -18,6 +18,14 @@
 
 project('nss-tls', 'c', version: '0.1', license : ['LGPL2.1+'])
 
+resolver = get_option('resolver')
+
+resolver_domain = resolver
+resolver_tokens = resolver.split('/')
+if resolver_tokens.length() > 0
+    resolver_domain = resolver_tokens[0]
+endif
+
 nss_tls_socket_name = 'nss-tls.socket'
 nss_tls_socket_path = '@0@/run/@1@'.format(get_option('localstatedir'),
                                            nss_tls_socket_name)
@@ -28,7 +36,8 @@ nss_tlsd_path = join_paths(get_option('prefix'),
                            'nss-tlsd')
 
 add_project_arguments(
-    '-DNSS_TLS_RESOLVER="@0@"'.format(get_option('resolver')),
+    '-DNSS_TLS_RESOLVER="@0@"'.format(resolver),
+    '-DNSS_TLS_RESOLVER_DOMAIN="@0@"'.format(resolver_domain),
     '-DNSS_TLS_SOCKET_NAME="@0@"'.format(nss_tls_socket_name),
     '-DNSS_TLS_SOCKET_PATH="@0@"'.format(nss_tls_socket_path),
     '-DNSS_TLS_TIMEOUT=@0@'.format(get_option('timeout')),
