@@ -18,7 +18,9 @@
 
 project('nss-tls', 'c', version: '0.1', license : ['LGPL2.1+'])
 
-nss_tls_socket = '@0@/run/nss-tls.socket'.format(get_option('localstatedir'))
+nss_tls_socket_name = 'nss-tls.socket'
+nss_tls_socket_path = '@0@/run/@1@'.format(get_option('localstatedir'),
+                                           nss_tls_socket_name)
 nss_tls_user_agent = '@0@/@1@'.format(meson.project_name(),
                                       meson.project_version())
 nss_tlsd_path = join_paths(get_option('prefix'),
@@ -27,7 +29,8 @@ nss_tlsd_path = join_paths(get_option('prefix'),
 
 add_project_arguments(
     '-DNSS_TLS_RESOLVER="@0@"'.format(get_option('resolver')),
-    '-DNSS_TLS_SOCKET="@0@"'.format(nss_tls_socket),
+    '-DNSS_TLS_SOCKET_NAME="@0@"'.format(nss_tls_socket_name),
+    '-DNSS_TLS_SOCKET_PATH="@0@"'.format(nss_tls_socket_path),
     '-DNSS_TLS_TIMEOUT=@0@'.format(get_option('timeout')),
     '-DNSS_TLS_USER_AGENT="@0@"'.format(nss_tls_user_agent),
     language: 'c'
@@ -56,12 +59,20 @@ systemd = dependency('systemd', required: false)
 if systemd.found()
     cfg = configuration_data()
     cfg.set('nss_tlsd_path', nss_tlsd_path)
+
     nss_tlsd_service = configure_file(input: 'nss-tlsd.service.in',
                                       output: 'nss-tlsd.service',
                                       configuration: cfg)
-
     systemd_unit_dir = systemd.get_pkgconfig_variable('systemdsystemunitdir')
     install_data(nss_tlsd_service, install_dir: systemd_unit_dir)
+
+    nss_tlsd_user_service = configure_file(input: 'nss-tlsd-user.service.in',
+                                           output: 'nss-tlsd-user.service',
+                                           configuration: cfg)
+    systemd_user_unit_dir = systemd.get_pkgconfig_variable('systemduserunitdir')
+    install_data(nss_tlsd_user_service,
+                 install_dir: systemd_user_unit_dir,
+                 rename: 'nss-tlsd.service')
 endif
 
 install_man('nss-tlsd.8')

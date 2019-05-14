@@ -18,6 +18,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
+#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -41,7 +42,9 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
     struct sockaddr_un sun = {.sun_family = AF_UNIX};
     struct timeval tv = {.tv_sec = NSS_TLS_TIMEOUT / 2, .tv_usec = 0};
     struct nss_tls_data *data = (struct nss_tls_data *)buf;
+    const char *dir;
     ssize_t out, total;
+    size_t len;
     int s, i;
     uint8_t count;
 
@@ -57,6 +60,26 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
     if (strcmp(name, NSS_TLS_RESOLVER) == 0)
         return NSS_STATUS_NOTFOUND;
 
+    if (geteuid() == 0)
+        strcpy(sun.sun_path, NSS_TLS_SOCKET_PATH);
+    else {
+        dir = getenv("XDG_RUNTIME_DIR");
+        if (dir) {
+            len = strlen(dir);
+            if (len > sizeof(sun.sun_path) - sizeof("/"NSS_TLS_SOCKET_NAME))
+                return NSS_STATUS_TRYAGAIN;
+
+            memcpy(sun.sun_path, dir, len);
+            sun.sun_path[len] = '/';
+            ++len;
+            strncpy(sun.sun_path + len,
+                    NSS_TLS_SOCKET_NAME,
+                    sizeof(sun.sun_path) - len);
+            sun.sun_path[sizeof(sun.sun_path) - 1] = '\0';
+        } else
+            strcpy(sun.sun_path, NSS_TLS_SOCKET_PATH);
+    }
+
     s = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (s < 0) {
         *errnop = EAGAIN;
@@ -69,7 +92,6 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
         return NSS_STATUS_TRYAGAIN;
     }
 
-    strcpy(sun.sun_path, NSS_TLS_SOCKET);
     if (connect(s, (const struct sockaddr *)&sun, sizeof(sun)) < 0) {
         close(s);
         return NSS_STATUS_TRYAGAIN;

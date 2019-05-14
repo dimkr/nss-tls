@@ -51,8 +51,11 @@ nss-tls depends on:
   - JSON-GLib (https://wiki.gnome.org/Projects/JsonGlib)
 
 If systemd (https://www.freedesktop.org/wiki/Software/systemd/) is present,
-the installation of nss-tls includes a unit for nss-tlsd. However, nss-tlsd does
-not depend on systemd.
+the installation of nss-tls includes unit files for nss-tlsd.
+
+However, nss-tlsd does not depend on systemd. When systemd is not present, other
+means of running a nss-tlsd instance for each user (e.g. xinitrc) and root (e.g.
+an init script) should be used.
 
 nss-tls uses Meson (http://mesonbuild.com/) as its build system.
 
@@ -74,9 +77,14 @@ Assuming your system runs systemd
   3) systemctl daemon-reload
   4) systemctl enable nss-tlsd
   5) systemctl start nss-tlsd
-  6) ldconfig
-  7) Add "tls" to the "hosts" entry in /etc/nsswitch.conf, before "dns" or
+  6) systemctl --user --global enable nss-tlsd
+  7) systemctl --user start nss-tlsd
+  8) ldconfig
+  9) Add "tls" to the "hosts" entry in /etc/nsswitch.conf, before "dns" or
      anything else that contains "dns" in its name
+
+This will enable a system nss-tlsd instance for all non-interactive processes
+and a private instance of nss-tlsd for each user.
 
 Choosing a DoH Server
 =====================

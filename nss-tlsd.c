@@ -423,12 +423,29 @@ on_term (gpointer user_data)
 
 int main(int argc, char **argv)
 {
+    static char root_socket[] = NSS_TLS_SOCKET_PATH;
     GMainLoop *loop;
     GSocketService *s;
     GSocketAddress *sa;
+    const gchar *runtime_dir;
+    gchar *user_socket = root_socket;
+    int mode = 0666;
 
-    g_unlink (NSS_TLS_SOCKET);
-    sa = g_unix_socket_address_new (NSS_TLS_SOCKET);
+    if (geteuid() != 0) {
+        runtime_dir = g_get_user_runtime_dir ();
+        if (!runtime_dir) {
+            return EXIT_FAILURE;
+        }
+
+        user_socket = g_build_path ("/",
+                                    runtime_dir,
+                                    NSS_TLS_SOCKET_NAME,
+                                    NULL);
+        mode = 0600;
+    }
+
+    g_unlink (user_socket);
+    sa = g_unix_socket_address_new (user_socket);
     s = g_socket_service_new ();
     loop = g_main_loop_new (NULL, FALSE);
 
@@ -445,7 +462,7 @@ int main(int argc, char **argv)
                       G_CALLBACK (on_connection),
                       NULL);
     g_socket_service_start (s);
-    g_chmod (NSS_TLS_SOCKET , 0666);
+    g_chmod (user_socket , mode);
 
     g_unix_signal_add (SIGINT, on_term, loop);
     g_unix_signal_add (SIGTERM, on_term, loop);
@@ -454,7 +471,10 @@ int main(int argc, char **argv)
 
     g_main_loop_unref (loop);
     g_object_unref (s);
-    g_unlink (NSS_TLS_SOCKET);
+    g_unlink (user_socket);
+    if (user_socket != root_socket) {
+        g_free (user_socket);
+    }
     g_object_unref (sa);
 
     return EXIT_SUCCESS;
