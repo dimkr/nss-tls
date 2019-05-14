@@ -32,7 +32,7 @@ their own, built-in DNS resolver.
 Architecture
 ============
 
-nss-tls consists of two parts:
+nss-tls consists of three parts:
   - nss-tlsd runs in the background and receives DNS resolving requests over a
     Unix socket.
   - libnss_tls.so is a tiny client library which delegates the resolving work to
@@ -40,6 +40,8 @@ nss-tls consists of two parts:
     application. This way, applications that take advantage of nss-tls are not
     affected by the complexity and the resource consumption of the libraries it
     depends on, or the constraints they impose on applications that use them.
+  - tlslookup is equivalent to nslookup(1), but uses libnss_tls.so instead of
+    DNS
 
 Dependencies
 ============
