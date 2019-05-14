@@ -54,7 +54,7 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
 
     /* must be resolved by other means, otherwise this results in infinite
      * recursion */
-    if (strcmp(name, NSS_TLS_RESOLVER) == 0)
+    if (strcmp(name, NSS_TLS_RESOLVER_DOMAIN) == 0)
         return NSS_STATUS_NOTFOUND;
 
     s = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);

@@ -25,8 +25,17 @@ nss_tlsd_path = join_paths(get_option('prefix'),
                            get_option('sbindir'),
                            'nss-tlsd')
 
+resolver = get_option('resolver')
+
+resolver_domain = resolver
+resolver_tokens = resolver.split('/')
+if resolver_tokens.length() > 0
+    resolver_domain = resolver_tokens[0]
+endif
+
 add_project_arguments(
-    '-DNSS_TLS_RESOLVER="@0@"'.format(get_option('resolver')),
+    '-DNSS_TLS_RESOLVER="@0@"'.format(resolver),
+    '-DNSS_TLS_RESOLVER_DOMAIN="@0@"'.format(resolver_domain),
     '-DNSS_TLS_SOCKET="@0@"'.format(nss_tls_socket),
     '-DNSS_TLS_TIMEOUT=@0@'.format(get_option('timeout')),
     '-DNSS_TLS_USER_AGENT="@0@"'.format(nss_tls_user_agent),
