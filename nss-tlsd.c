@@ -20,12 +20,16 @@
 
 #include <stdlib.h>
 #include <arpa/inet.h>
+#include <sys/types.h>
+#include <pwd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <grp.h>
+#include <errno.h>
 
 #include <glib.h>
 #include <glib/gstdio.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <glib-unix.h>
 #include <gio/gio.h>
 #include <gio/gunixsocketaddress.h>
@@ -421,17 +425,45 @@ on_term (gpointer user_data)
     return FALSE;
 }
 
-int main(int argc, char **argv)
+int main (int argc, char **argv)
 {
     static char root_socket[] = NSS_TLS_SOCKET_PATH;
     GMainLoop *loop;
     GSocketService *s;
     GSocketAddress *sa;
     const gchar *runtime_dir;
+    struct passwd *user;
     gchar *user_socket = root_socket;
-    int mode = 0666;
+    int mode = 0600;
+    uid_t uid;
+    gid_t gid;
+    gboolean root;
 
-    if (geteuid() != 0) {
+    root = (geteuid () == 0);
+    if (root) {
+        user = getpwnam (NSS_TLS_USER);
+        if (!user) {
+            return EXIT_FAILURE;
+        }
+
+        uid = user->pw_uid;
+        gid = user->pw_gid;
+
+        /*
+         * create a directory owned by a non-privileged user, where we put the
+         * socket
+         */
+        if (((mkdir (NSS_TLS_SOCKET_DIR, 0755) < 0) &&
+             ((errno != EEXIST) || (chmod (NSS_TLS_SOCKET_DIR, 0755) < 0))) ||
+            (chown (NSS_TLS_SOCKET_DIR, uid, gid) < 0) ||
+            (setgroups (1, &gid) < 0) ||
+            (setgid (gid) < 0) ||
+            (setuid (uid) < 0)) {
+            return EXIT_FAILURE;
+        }
+
+        mode = 0666;
+    } else {
         runtime_dir = g_get_user_runtime_dir ();
         if (!runtime_dir) {
             return EXIT_FAILURE;
@@ -441,7 +473,6 @@ int main(int argc, char **argv)
                                     runtime_dir,
                                     NSS_TLS_SOCKET_NAME,
                                     NULL);
-        mode = 0600;
     }
 
     g_unlink (user_socket);
