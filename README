@@ -41,7 +41,14 @@ nss-tls consists of three parts:
     affected by the complexity and the resource consumption of the libraries it
     depends on, or the constraints they impose on applications that use them.
   - tlslookup is equivalent to nslookup(1), but uses libnss_tls.so instead of
-    DNS
+    DNS.
+
+nss-tls is designed with security and privacy in mind. Therefore, an
+unprivileged user can start a private, unprivileged instance of nss-tlsd and
+libnss-tls.so will automatically use that one, instead of the system-wide
+instance of nss-tlsd. Users who don't have such a private instance will continue
+to use the system-wide instance, which drops its privileges to greatly reduce
+its attack surface.
 
 Dependencies
 ============
@@ -86,7 +93,8 @@ Assuming your system runs systemd
      anything else that contains "dns" in its name
 
 This will enable a system nss-tlsd instance for all non-interactive processes
-and a private instance of nss-tlsd for each user.
+(which runs as an unprivileged user) and a private instance of nss-tlsd for each
+user.
 
 Choosing a DoH Server
 =====================
