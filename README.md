@@ -6,6 +6,8 @@
 |_| |_|___/___/      \__|_|___/
 ```
 
+![Build Status](https://codebuild.us-east-1.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiUzM4dGlsK2dPMmdoRkNQcjRjSU1JVmJENHNCTFFHVzVXSUQ0eWw2ajhYZVU3d0hhb2s0d0pzdzNNZUxSenc2Y1J3VmNyak9Udy91cUVsazlOR1h4WWJZPSIsIml2UGFyYW1ldGVyU3BlYyI6IjdFTWxobnVDRVVLbWNkUEYiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=master)
+
 ## Motivation
 
 Unlike most web browser traffic, which is encrypted thanks to HTTPS, the resolving of domain names to internet addresses still happens through DNS, an old, unencrypted protocol. This benefits analytics companies, advertisers, internet providers and attackers, but not the end-user, who seeks online privacy and security.
@@ -38,7 +40,7 @@ nss-tls depends on:
 
 If [systemd](https://www.freedesktop.org/wiki/Software/systemd/) is present, the installation of nss-tls includes unit files for nss-tlsd.
 
-However, nss-tlsd does not depend on systemd. When systemd is not present, other means of running a nss-tlsd instance for each user (e.g. xinitrc) and root (e.g. an init script) should be used.
+However, nss-tlsd does not depend on [systemd](https://www.freedesktop.org/wiki/Software/systemd/). When [systemd](https://www.freedesktop.org/wiki/Software/systemd/) is not present, other means of running a nss-tlsd instance for each user (e.g. xinitrc) and root (e.g. an init script) should be used.
 
 nss-tls uses [Meson](http://mesonbuild.com/) as its build system.
 
