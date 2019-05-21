@@ -1,7 +1,0 @@
-language: minimal
-
-services:
-  - docker
-
-script:
-  - docker run -e CI -w /root/nss-tls -v `pwd`:/root/nss-tls dimkr/nss-tls:latest ./ci.sh
