@@ -39,7 +39,5 @@ getent hosts ipv4.google.com
 getent hosts ipv6.google.com
 getent hosts google.com
 
-py.test ci.py -v -nauto
-
 kill $pid
 sleep 1
