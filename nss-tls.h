@@ -30,6 +30,7 @@ struct nss_tls_req {
 
 struct nss_tls_res {
     uint8_t count;
+    int64_t expiry;
     union {
         struct in_addr in;
         struct in6_addr in6;

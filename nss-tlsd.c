@@ -27,16 +27,21 @@
 #include <unistd.h>
 #include <grp.h>
 #include <errno.h>
+#include <limits.h>
 
 #include <glib.h>
 #include <glib/gstdio.h>
 #include <glib-unix.h>
 #include <gio/gio.h>
 #include <gio/gunixsocketaddress.h>
+#include <gmodule.h>
 #include <libsoup/soup.h>
 #include <json-glib/json-glib.h>
 
 #include "nss-tls.h"
+
+#define CACHE_CLEANUP_INTERVAL 5
+#define FALLBACK_TTL 60
 
 struct nss_tls_session {
     struct nss_tls_req request;
@@ -48,6 +53,69 @@ struct nss_tls_session {
     SoupMessage *message;
 };
 
+static GHashTable *caches[2];
+
+static
+gboolean
+check_ttl (gpointer key,
+           gpointer value,
+           gpointer user_data)
+{
+    const gchar *name = (const gchar *)key;
+    struct nss_tls_res *res = (struct nss_tls_res *)value;
+    gint64 now = *(gint64 *)user_data;
+
+    if (now > res->expiry) {
+        g_debug ("Cache for %s has expired", name);
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+static
+gboolean
+on_cache_cleanup (gpointer user_data)
+{
+    gint64 now;
+
+    now = g_get_monotonic_time ();
+
+    g_hash_table_foreach_remove (caches[1], check_ttl, &now);
+    g_hash_table_foreach_remove (caches[0], check_ttl, &now);
+
+    return TRUE;
+}
+
+static
+void
+add_to_cache (const struct nss_tls_req *req, struct nss_tls_res *res)
+{
+    gchar *key;
+    struct nss_tls_res *val;
+    gint64 now;
+
+    if (res->expiry == -1) {
+        now = g_get_monotonic_time ();
+        if (now > INT64_MAX - FALLBACK_TTL) {
+            return;
+        }
+
+        res->expiry = now + FALLBACK_TTL;
+    }
+
+    key = g_strdup (req->name);
+    val = g_memdup (res, sizeof (*res));
+
+    g_debug ("Caching %s until %"G_GINT64_FORMAT, req->name, res->expiry);
+
+    if (req->af == AF_INET) {
+        g_hash_table_insert (caches[0], key, val);
+    } else {
+        g_hash_table_insert (caches[1], key, val);
+    }
+}
+
 static
 void
 on_response (GObject         *source_object,
@@ -55,10 +123,39 @@ on_response (GObject         *source_object,
              gpointer        user_data);
 
 static
+void
+on_sent (GObject         *source_object,
+         GAsyncResult    *res,
+         gpointer        user_data);
+
+static
 gboolean
 resolve_domain (struct nss_tls_session *session)
 {
+    struct nss_tls_cache *res;
     gchar *url;
+    GOutputStream *out;
+
+    if (session->request.af == AF_INET) {
+        res = g_hash_table_lookup (caches[0], session->request.name);
+    } else {
+        res = g_hash_table_lookup (caches[1], session->request.name);
+    }
+
+    if (res) {
+        g_debug ("Found %s in the cache", session->request.name);
+
+        memcpy (&session->response, res, sizeof (session->response));
+        out = g_io_stream_get_output_stream (G_IO_STREAM (session->connection));
+        g_output_stream_write_all_async (out,
+                                         &session->response,
+                                         sizeof (session->response),
+                                         G_PRIORITY_DEFAULT,
+                                         NULL,
+                                         on_sent,
+                                         session);
+        return TRUE;
+    }
 
     switch (session->request.af) {
     case AF_INET:
@@ -184,7 +281,8 @@ on_answer (JsonArray    *array,
     JsonObject *answero;
     const gchar *data, *cname;
     void *dst = &session->response.addrs[session->response.count].in;
-    gint64 type;
+    gint64 type, ttl, now;
+    int64_t expiry;
 
     if (session->response.count >= NSS_TLS_ADDRS_MAX) {
         return;
@@ -233,6 +331,20 @@ on_answer (JsonArray    *array,
                  session->response.count,
                  data);
         ++session->response.count;
+    }
+
+    ttl = json_object_get_int_member (answero, "TTL");
+    if (ttl <= INT64_MAX / 1000000) {
+        ttl *= 1000000;
+        now = g_get_monotonic_time ();
+
+        if (INT64_MAX - ttl >= now) {
+            expiry = (int64_t)(now + ttl);
+            if ((session->response.expiry == -1) ||
+                (expiry < session->response.expiry)) {
+                session->response.expiry = expiry;
+            }
+        }
     }
 }
 
@@ -296,6 +408,8 @@ on_response (GObject         *source_object,
     answers = json_object_get_array_member (rooto, "Answer");
 
     json_array_foreach_element (answers, on_answer, session);
+
+    add_to_cache (&session->request, &session->response);
 
     if (session->cname && (session->response.count == 0)) {
         resolve_cname (session);
@@ -405,6 +519,7 @@ on_connection (GSocketService     *service,
     session = g_new0 (struct nss_tls_session, 1);
     session->connection = g_object_ref (connection);
     session->response.count = 0;
+    session->response.expiry = -1;
 
     in = g_io_stream_get_input_stream (G_IO_STREAM (connection));
     /* read the incoming request */
@@ -475,10 +590,17 @@ int main (int argc, char **argv)
                                     NULL);
     }
 
+    caches[0] = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
+    caches[1] = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
+
     g_unlink (user_socket);
     sa = g_unix_socket_address_new (user_socket);
     s = g_socket_service_new ();
     loop = g_main_loop_new (NULL, FALSE);
+
+    g_timeout_add_seconds (CACHE_CLEANUP_INTERVAL,
+                           on_cache_cleanup,
+                           NULL);
 
     g_socket_listener_add_address (G_SOCKET_LISTENER (s),
                                    sa,
@@ -507,6 +629,8 @@ int main (int argc, char **argv)
         g_free (user_socket);
     }
     g_object_unref (sa);
+    g_hash_table_unref (caches[1]);
+    g_hash_table_unref (caches[0]);
 
     return EXIT_SUCCESS;
 }
