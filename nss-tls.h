@@ -31,6 +31,7 @@ struct nss_tls_req {
 struct nss_tls_res {
     uint8_t count;
     int64_t expiry;
+    char cname[256];
     union {
         struct in_addr in;
         struct in6_addr in6;
@@ -38,7 +39,7 @@ struct nss_tls_res {
 } __attribute__((packed));
 
 struct nss_tls_data {
-    char *aliases[1];
+    char *aliases[2];
     char *addrs[NSS_TLS_ADDRS_MAX + 1];
     struct nss_tls_req req;
     struct nss_tls_res res;

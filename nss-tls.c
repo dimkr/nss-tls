@@ -155,7 +155,12 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
     data->addrs[i] = NULL;
 
     ret->h_name = data->req.name;
-    data->aliases[0] = NULL;
+    if (data->res.cname[0]) {
+        data->aliases[0] = data->res.cname;
+        data->aliases[1] = NULL;
+    } else {
+        data->aliases[0] = NULL;
+    }
     ret->h_aliases = data->aliases;
     ret->h_addrtype = af;
     ret->h_addr_list = data->addrs;

@@ -48,7 +48,6 @@ struct nss_tls_session {
     struct nss_tls_req request;
     struct nss_tls_res response;
     gint64 type;
-    gchar *cname;
     GSocketConnection *connection;
     SoupSession *session;
     SoupMessage *message;
@@ -162,7 +161,7 @@ on_sent (GObject         *source_object,
 
 static
 gboolean
-resolve_domain (struct nss_tls_session *session)
+resolve_domain (struct nss_tls_session *session, const char *name)
 {
     gchar *url;
 #ifdef NSS_TLS_CACHE
@@ -189,14 +188,14 @@ resolve_domain (struct nss_tls_session *session)
         /* A */
         session->type = 1;
         url = g_strdup_printf ("https://"NSS_TLS_RESOLVER"?ct=application/dns-json&name=%s&type=A",
-                               session->request.name);
+                               name);
         break;
 
     case AF_INET6:
         /* AAAA */
         session->type = 28;
         url = g_strdup_printf ("https://"NSS_TLS_RESOLVER"?ct=application/dns-json&name=%s&type=AAAA",
-                               session->request.name);
+                               name);
         break;
 
     default:
@@ -231,11 +230,7 @@ resolve_cname (struct nss_tls_session *session)
     session->session = NULL;
     session->message = NULL;
 
-    g_strlcpy (session->request.name, session->cname, sizeof (session->request.name));
-    g_free (session->cname);
-    session->cname = NULL;
-
-    resolve_domain (session);
+    resolve_domain (session, session->response.cname);
 }
 
 static
@@ -252,8 +247,6 @@ on_close (GObject       *source_object,
         soup_session_abort (session->session);
         g_object_unref (session->session);
     }
-
-    g_free (session->cname);
 
     g_object_unref (session->connection);
 
@@ -328,8 +321,14 @@ on_answer (JsonArray    *array,
         if (type == 5) {
             cname = json_object_get_string_member (answero, "data");
             if (cname && strcmp(cname, session->request.name)) {
-                g_debug ("The canonical name of %s is %s", session->request.name, cname);
-                session->cname = g_strdup (cname);
+                g_debug ("The canonical name of %s is %s",
+                         session->request.name,
+                         cname);
+                g_strlcpy (session->response.cname,
+                           cname,
+                           sizeof (session->response.cname));
+            } else {
+                session->response.cname[0] = '\0';
             }
         }
         return;
@@ -444,7 +443,7 @@ on_response (GObject         *source_object,
 
     json_array_foreach_element (answers, on_answer, session);
 
-    if (session->cname && (session->response.count == 0)) {
+    if (session->response.cname[0] && (session->response.count == 0)) {
         resolve_cname (session);
         return;
     } else if (session->response.count > 0) {
@@ -505,7 +504,6 @@ on_request (GObject         *source_object,
 
     session->session = NULL;
     session->message = NULL;
-    session->cname = NULL;
 
     if (!g_input_stream_read_all_finish (G_INPUT_STREAM (source_object),
                                          res,
@@ -528,7 +526,7 @@ on_request (GObject         *source_object,
 
     session->request.name[sizeof (session->request.name) - 1] = '\0';
 
-    if (resolve_domain (session)) {
+    if (resolve_domain (session, session->request.name)) {
         return;
     }
 
