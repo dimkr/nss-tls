@@ -43,6 +43,7 @@
 
 #define CACHE_CLEANUP_INTERVAL 5
 #define FALLBACK_TTL (60 * 1000000)
+#define MIN_TTL 10
 #define CACHE_SIZE 1024
 
 struct nss_tls_session {
@@ -359,6 +360,9 @@ on_answer (JsonArray    *array,
      */
     ttl = json_object_get_int_member (answero, "TTL");
     if (ttl <= INT64_MAX / 1000000) {
+        if (ttl < MIN_TTL) {
+            ttl = MIN_TTL;
+        }
         ttl *= 1000000;
         now = g_get_monotonic_time ();
 
