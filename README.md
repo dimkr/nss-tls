@@ -14,7 +14,7 @@ Unlike most web browser traffic, which is encrypted thanks to HTTPS, the resolvi
 
 ## Overview
 
-nss-tls is an alternative name resolving library for [Linux](http://www.kernel.org/) distributions with [glibc](https://www.gnu.org/software/libc/).
+nss-tls is an alternative, encrypted name resolving library for [Linux](http://www.kernel.org/) distributions with [glibc](https://www.gnu.org/software/libc/), which uses [DNS-over-HTTPS (DoH)](https://tools.ietf.org/html/rfc8484).
 
 The glibc name resolver can be configured through nsswitch.conf(5) to use nss-tls instead of the DNS resolver, or fall back to DNS when nss-tls fails.
 
@@ -62,17 +62,27 @@ Assuming your system runs [systemd](https://www.freedesktop.org/wiki/Software/sy
     systemctl --user start nss-tlsd
     ldconfig
 
-Then, add "tls" to the "hosts" entry in /etc/nsswitch.conf, before "dns" or anything else that contains "dns" in its name.
+Then, add "tls" to the "hosts" entry in /etc/nsswitch.conf, before "dns" or anything else that contains "dns".
 
-This will enable a system nss-tlsd instance for all non-interactive processes (which runs as an unprivileged user) and a private instance of nss-tlsd for each user.
+This will enable a system nss-tlsd instance for all non-interactive processes (which runs as an unprivileged user) and a private instance of nss-tlsd for each user. Name resolving will happen through nss-tls and DNS will be attempted only if nss-tls fails.
 
 ## Choosing a DoH Server
 
-By default, nss-tls performs encrypted name lookup over HTTPS through [1.1.1.1](https://developers.cloudflare.com/1.1.1.1/dns-over-https/).
+By default, nss-tls performs encrypted name lookup over HTTPS through [cloudflare-dns.com/dns-query](https://developers.cloudflare.com/1.1.1.1/dns-over-https/).
 
 To use a different DNS over HTTPS (DoH) server, use the "resolver" build option:
 
     meson configure -Dresolver=dns9.quad9.net/dns-query
+
+## DoH Without Fallback to DNS
+
+To use nss-tls for name resolving, without falling back to DNS if resolving fails, build nss-tls with a DoH server specified using an address, e.g.:
+
+    meson configure -Dresolver=1.1.1.1/dns-query
+
+This way, nss-tls will not depend on other means of name resolving to resolve the DoH server name.
+
+Then, remove all DNS resolvers from the "hosts" entry in /etc/nsswitch.conf and keep "tls".
 
 ## Performance
 
