@@ -28,6 +28,7 @@
 #include <grp.h>
 #include <errno.h>
 #include <limits.h>
+#include <string.h>
 
 #include <glib.h>
 #include <glib/gstdio.h>
@@ -80,11 +81,13 @@ gboolean
 on_cache_cleanup (gpointer user_data)
 {
     gint64 now;
+    gint i;
 
     now = g_get_monotonic_time ();
 
-    g_hash_table_foreach_remove (caches[1], check_ttl, &now);
-    g_hash_table_foreach_remove (caches[0], check_ttl, &now);
+    for (i = 0; i < G_N_ELEMENTS(caches); ++i) {
+        g_hash_table_foreach_remove (caches[i], check_ttl, &now);
+    }
 
     return TRUE;
 }
@@ -274,19 +277,10 @@ on_sent (GObject         *source_object,
     struct nss_tls_session *session = (struct nss_tls_session *)user_data;
     gsize out;
 
-    if (g_output_stream_write_all_finish (G_OUTPUT_STREAM (source_object),
-                                          res,
-                                          &out,
-                                          NULL) &&
-        (out == sizeof (session->response))) {
-        g_debug ("Done querying %s (%hhu results)",
-                 session->request.name,
-                 session->response.count);
-    }
-    else {
-        g_debug ("Failed to query %s", session->request.name);
-    }
-
+    g_output_stream_write_all_finish (G_OUTPUT_STREAM (source_object),
+                                      res,
+                                      &out,
+                                      NULL);
     stop_session (session);
 }
 
@@ -352,10 +346,6 @@ on_answer (JsonArray    *array,
     }
 
     if (inet_pton (session->request.af, data, dst)) {
-        g_debug ("%s[%hhu] = %s",
-                 session->request.name,
-                 session->response.count,
-                 data);
         ++session->response.count;
     }
 
@@ -363,7 +353,10 @@ on_answer (JsonArray    *array,
         return;
     }
 
-    /* we keep only the shortest TTL */
+    /*
+     * after looking at all answer records, we use the shortest TTL for all
+     * answers
+     */
     ttl = json_object_get_int_member (answero, "TTL");
     if (ttl <= INT64_MAX / 1000000) {
         ttl *= 1000000;
@@ -433,7 +426,6 @@ on_response (GObject         *source_object,
     }
 
     if (!json_object_has_member (rooto, "Answer")) {
-        g_warning ("No Answer member for %s", session->request.name);
 #ifdef NSS_TLS_CACHE
         add_to_cache (&session->request, &session->response);
 #endif
@@ -459,6 +451,11 @@ on_response (GObject         *source_object,
                                          NULL,
                                          on_sent,
                                          session);
+
+        g_debug ("Done querying %s (%hhu results)",
+                 session->request.name,
+                 session->response.count);
+
         return;
     }
 
