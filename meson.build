@@ -50,6 +50,10 @@ add_project_arguments(
     language: 'c'
 )
 
+if get_option('cache')
+    add_project_arguments('-DNSS_TLS_CACHE', language: 'c')
+endif
+
 nss_tlsd = executable('nss-tlsd',
                       'nss-tlsd.c',
                       dependencies: [

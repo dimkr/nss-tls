@@ -46,8 +46,8 @@ nss-tls uses [Meson](http://mesonbuild.com/) as its build system.
 
 On [Debian](http://www.debian.org/) and derivatives, these dependencies can be obtained using:
 
-1. apt install libglib2.0-dev libsoup2.4-dev libjson-glib-dev ninja-build python3-pip
-2. pip3 install meson
+    apt install libglib2.0-dev libsoup2.4-dev libjson-glib-dev ninja-build python3-pip
+    pip3 install meson
 
 ## Usage
 
@@ -76,9 +76,15 @@ To use a different DNS over HTTPS (DoH) server, use the "resolver" build option:
 
 ## Performance
 
-DNS over HTTPS is much slower than DNS. Therefore, it is recommended to enable cache of name lookup results. nscd(8) can do that.
+DNS over HTTPS is much slower than DNS. Therefore, every nss-tls instances maintains an internal cache of lookup results.
 
-To enable DNS cache on [Debian](http://www.debian.org/) and derivatives:
+However, one may wish to use a system-wide cache; nscd(8) can do that.
+
+To disable the internal cache, use the "cache" build option:
+
+    meson configure -Dcache=false
+
+To enable system-wide DNS cache on [Debian](http://www.debian.org/) and derivatives:
 
     apt install unscd
 

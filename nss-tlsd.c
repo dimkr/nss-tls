@@ -41,7 +41,8 @@
 #include "nss-tls.h"
 
 #define CACHE_CLEANUP_INTERVAL 5
-#define FALLBACK_TTL 60
+#define FALLBACK_TTL (60 * 1000000)
+#define CACHE_SIZE 1024
 
 struct nss_tls_session {
     struct nss_tls_req request;
@@ -52,6 +53,8 @@ struct nss_tls_session {
     SoupSession *session;
     SoupMessage *message;
 };
+
+#ifdef NSS_TLS_CACHE
 
 static GHashTable *caches[2];
 
@@ -88,12 +91,30 @@ on_cache_cleanup (gpointer user_data)
 }
 
 static
+GHashTable *
+choose_cache (const struct nss_tls_req *req)
+{
+    if (req->af == AF_INET) {
+        return caches[0];
+    }
+
+    return caches[1];
+}
+
+static
 void
 add_to_cache (const struct nss_tls_req *req, struct nss_tls_res *res)
 {
     gchar *key;
     struct nss_tls_res *val;
     gint64 now;
+    GHashTable *cache;
+
+    cache = choose_cache(req);
+
+    if (g_hash_table_size (cache) >= CACHE_SIZE) {
+        return;
+    }
 
     if (res->expiry == -1) {
         now = g_get_monotonic_time ();
@@ -107,14 +128,25 @@ add_to_cache (const struct nss_tls_req *req, struct nss_tls_res *res)
     key = g_strdup (req->name);
     val = g_memdup (res, sizeof (*res));
 
+    g_hash_table_insert (cache, key, val);
     g_debug ("Caching %s until %"G_GINT64_FORMAT, req->name, res->expiry);
-
-    if (req->af == AF_INET) {
-        g_hash_table_insert (caches[0], key, val);
-    } else {
-        g_hash_table_insert (caches[1], key, val);
-    }
 }
+
+static
+const struct nss_tls_res *
+query_cache (const struct nss_tls_req *req)
+{
+    gpointer res;
+
+    res = g_hash_table_lookup (choose_cache(req), req->name);
+    if (res) {
+        g_debug ("Found %s in the cache", req->name);
+    }
+
+    return (const struct nss_tls_res *)res;
+}
+
+#endif
 
 static
 void
@@ -132,19 +164,13 @@ static
 gboolean
 resolve_domain (struct nss_tls_session *session)
 {
-    struct nss_tls_cache *res;
     gchar *url;
+#ifdef NSS_TLS_CACHE
     GOutputStream *out;
+    const struct nss_tls_res *res;
 
-    if (session->request.af == AF_INET) {
-        res = g_hash_table_lookup (caches[0], session->request.name);
-    } else {
-        res = g_hash_table_lookup (caches[1], session->request.name);
-    }
-
+    res = query_cache (&session->request);
     if (res) {
-        g_debug ("Found %s in the cache", session->request.name);
-
         memcpy (&session->response, res, sizeof (session->response));
         out = g_io_stream_get_output_stream (G_IO_STREAM (session->connection));
         g_output_stream_write_all_async (out,
@@ -156,6 +182,7 @@ resolve_domain (struct nss_tls_session *session)
                                          session);
         return TRUE;
     }
+#endif
 
     switch (session->request.af) {
     case AF_INET:
@@ -333,6 +360,11 @@ on_answer (JsonArray    *array,
         ++session->response.count;
     }
 
+    if (!json_object_has_member (answero, "TTL")) {
+        return;
+    }
+
+    /* we keep only the shortest TTL */
     ttl = json_object_get_int_member (answero, "TTL");
     if (ttl <= INT64_MAX / 1000000) {
         ttl *= 1000000;
@@ -403,18 +435,23 @@ on_response (GObject         *source_object,
 
     if (!json_object_has_member (rooto, "Answer")) {
         g_warning ("No Answer member for %s", session->request.name);
+#ifdef NSS_TLS_CACHE
+        add_to_cache (&session->request, &session->response);
+#endif
         goto cleanup;
     }
     answers = json_object_get_array_member (rooto, "Answer");
 
     json_array_foreach_element (answers, on_answer, session);
 
-    add_to_cache (&session->request, &session->response);
-
     if (session->cname && (session->response.count == 0)) {
         resolve_cname (session);
         return;
     } else if (session->response.count > 0) {
+#ifdef NSS_TLS_CACHE
+        add_to_cache (&session->request, &session->response);
+#endif
+
         out = g_io_stream_get_output_stream (G_IO_STREAM (session->connection));
         g_output_stream_write_all_async (out,
                                          &session->response,
@@ -550,6 +587,7 @@ int main (int argc, char **argv)
     struct passwd *user;
     gchar *user_socket = root_socket;
     int mode = 0600;
+    gint i;
     uid_t uid;
     gid_t gid;
     gboolean root;
@@ -590,17 +628,25 @@ int main (int argc, char **argv)
                                     NULL);
     }
 
-    caches[0] = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
-    caches[1] = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
+#ifdef NSS_TLS_CACHE
+    for (i = 0; i < G_N_ELEMENTS(caches); ++i) {
+        caches[i] = g_hash_table_new_full (g_str_hash,
+                                           g_str_equal,
+                                           g_free,
+                                           g_free);
+    }
+#endif
 
     g_unlink (user_socket);
     sa = g_unix_socket_address_new (user_socket);
     s = g_socket_service_new ();
     loop = g_main_loop_new (NULL, FALSE);
 
+#ifdef NSS_TLS_CACHE
     g_timeout_add_seconds (CACHE_CLEANUP_INTERVAL,
                            on_cache_cleanup,
                            NULL);
+#endif
 
     g_socket_listener_add_address (G_SOCKET_LISTENER (s),
                                    sa,
@@ -629,8 +675,11 @@ int main (int argc, char **argv)
         g_free (user_socket);
     }
     g_object_unref (sa);
-    g_hash_table_unref (caches[1]);
-    g_hash_table_unref (caches[0]);
+#ifdef NSS_TLS_CACHE
+    for (i = G_N_ELEMENTS(caches) - 1; i >= 0; --i) {
+        g_hash_table_unref (caches[i]);
+    }
+#endif
 
     return EXIT_SUCCESS;
 }
