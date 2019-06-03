@@ -68,25 +68,25 @@ This will enable a system nss-tlsd instance for all non-interactive processes (w
 
 ## Choosing a DoH Server
 
-By default, nss-tls performs encrypted name lookup over HTTPS through [cloudflare-dns.com/dns-query](https://developers.cloudflare.com/1.1.1.1/dns-over-https/).
+By default, nss-tls performs name lookup through [cloudflare-dns.com/dns-query](https://developers.cloudflare.com/1.1.1.1/dns-over-https/).
 
-To use a different DNS over HTTPS (DoH) server, use the "resolver" build option:
+To use a different DoH server, use the "resolver" build option:
 
     meson configure -Dresolver=dns9.quad9.net/dns-query
 
 ## DoH Without Fallback to DNS
 
-To use nss-tls for name resolving, without falling back to DNS if resolving fails, build nss-tls with a DoH server specified using an address, e.g.:
+To use nss-tls for name resolving, without falling back to DNS if resolving fails, build nss-tls with a DoH server specified using its address, e.g.:
 
     meson configure -Dresolver=1.1.1.1/dns-query
 
-This way, nss-tls will not depend on other means of name resolving to resolve the DoH server name.
+This way, nss-tls will not depend on other means of name resolving to resolve the DoH server address.
 
 Then, remove all DNS resolvers from the "hosts" entry in /etc/nsswitch.conf and keep "tls".
 
 ## Performance
 
-DNS over HTTPS is much slower than DNS. Therefore, each nss-tls instance maintains an internal cache of lookup results.
+DNS over HTTPS is much slower than DNS. Therefore, by default, each nss-tls instance maintains an internal cache of lookup results.
 
 However, one may wish to use a system-wide cache; nscd(8) can do that.
 
