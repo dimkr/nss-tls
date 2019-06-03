@@ -28,7 +28,7 @@ nss-tls consists of three parts:
 * libnss_tls.so is a tiny client library which delegates the resolving work to nss-tlsd through the Unix socket and passes the results back to the application. This way, applications that take advantage of nss-tls are not affected by the complexity and the resource consumption of the libraries it depends on, or the constraints they impose on applications that use them.
 * tlslookup is equivalent to nslookup(1), but uses libnss_tls.so instead of DNS.
 
-nss-tls is designed with security and privacy in mind. Therefore, an unprivileged user can start a private, unprivileged instance of nss-tlsd and libnss-tls.so will automatically use that one, instead of the system-wide instance of nss-tlsd. Users who don't have such a private instance will continue to use the system-wide instance, which drops its privileges to greatly reduce its attack surface.
+nss-tls is designed with security and privacy in mind. Therefore, an unprivileged user can start a private, unprivileged instance of nss-tlsd and libnss-tls.so will automatically use that one, instead of the system-wide instance of nss-tlsd. In addition to the security benefit, the user's nss-tls instance holds its own cache of lookup results to prevent extraction of browsing history by other users, using timing-based methods. Users who don't have such a private instance will continue to use the system-wide instance, which drops its privileges to greatly reduce its attack surface.
 
 ## Dependencies
 
@@ -76,7 +76,7 @@ To use a different DNS over HTTPS (DoH) server, use the "resolver" build option:
 
 ## Performance
 
-DNS over HTTPS is much slower than DNS. Therefore, every nss-tls instances maintains an internal cache of lookup results.
+DNS over HTTPS is much slower than DNS. Therefore, each nss-tls instance maintains an internal cache of lookup results.
 
 However, one may wish to use a system-wide cache; nscd(8) can do that.
 
