@@ -590,6 +590,9 @@ int main (int argc, char **argv)
     uid_t uid;
     gid_t gid;
     gboolean root;
+#ifdef NSS_TLS_CACHE
+    gboolean cache = TRUE;
+#endif
 
     root = (geteuid () == 0);
     if (root) {
@@ -615,6 +618,13 @@ int main (int argc, char **argv)
         }
 
         mode = 0666;
+#ifdef NSS_TLS_CACHE
+        /*
+         * a user should not be allowed to determine whether or not another user
+         * resolved a domain, by checking how much time it takes to resolve it
+         */
+        cache = FALSE;
+#endif
     } else {
         runtime_dir = g_get_user_runtime_dir ();
         if (!runtime_dir) {
@@ -628,11 +638,13 @@ int main (int argc, char **argv)
     }
 
 #ifdef NSS_TLS_CACHE
-    for (i = 0; i < G_N_ELEMENTS(caches); ++i) {
-        caches[i] = g_hash_table_new_full (g_str_hash,
-                                           g_str_equal,
-                                           g_free,
-                                           g_free);
+    if (cache) {
+        for (i = 0; i < G_N_ELEMENTS(caches); ++i) {
+            caches[i] = g_hash_table_new_full (g_str_hash,
+                                               g_str_equal,
+                                               g_free,
+                                               g_free);
+        }
     }
 #endif
 
@@ -642,9 +654,11 @@ int main (int argc, char **argv)
     loop = g_main_loop_new (NULL, FALSE);
 
 #ifdef NSS_TLS_CACHE
-    g_timeout_add_seconds (CACHE_CLEANUP_INTERVAL,
-                           on_cache_cleanup,
-                           NULL);
+    if (cache) {
+        g_timeout_add_seconds (CACHE_CLEANUP_INTERVAL,
+                               on_cache_cleanup,
+                               NULL);
+    }
 #endif
 
     g_socket_listener_add_address (G_SOCKET_LISTENER (s),
@@ -675,8 +689,10 @@ int main (int argc, char **argv)
     }
     g_object_unref (sa);
 #ifdef NSS_TLS_CACHE
-    for (i = G_N_ELEMENTS(caches) - 1; i >= 0; --i) {
-        g_hash_table_unref (caches[i]);
+    if (cache) {
+        for (i = G_N_ELEMENTS(caches) - 1; i >= 0; --i) {
+            g_hash_table_unref (caches[i]);
+        }
     }
 #endif
 
