@@ -70,7 +70,7 @@ Then, add "tls" to the "hosts" entry in /etc/nsswitch.conf, before "dns" or anyt
 
 This will enable a system nss-tlsd instance for all non-interactive processes (which runs as an unprivileged user) and a private instance of nss-tlsd for each user. Name resolving will happen through nss-tls and DNS will be attempted only if nss-tls fails.
 
-## Choosing a DoH Servers
+## Choosing a DoH Server
 
 By default, nss-tls performs all name lookup through [cloudflare-dns.com/dns-query](https://developers.cloudflare.com/1.1.1.1/dns-over-https/).
 
