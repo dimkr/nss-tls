@@ -167,7 +167,9 @@ static
 gboolean
 resolve_domain (struct nss_tls_session *session, const char *name)
 {
+    static const gchar *urls[] = {NSS_TLS_RESOLVER_URLS};
     gchar *url;
+    guint id = 0;
 #ifdef NSS_TLS_CACHE
     GOutputStream *out;
     const struct nss_tls_res *res;
@@ -187,18 +189,24 @@ resolve_domain (struct nss_tls_session *session, const char *name)
     }
 #endif
 
+    if (G_N_ELEMENTS (urls) > 1) {
+        id = g_str_hash (name) % G_N_ELEMENTS (urls);
+    }
+
     switch (session->request.af) {
     case AF_INET:
         /* A */
         session->type = 1;
-        url = g_strdup_printf ("https://"NSS_TLS_RESOLVER"?ct=application/dns-json&name=%s&type=A",
+        url = g_strdup_printf ("https://%s?ct=application/dns-json&name=%s&type=A",
+                               urls[id],
                                name);
         break;
 
     case AF_INET6:
         /* AAAA */
         session->type = 28;
-        url = g_strdup_printf ("https://"NSS_TLS_RESOLVER"?ct=application/dns-json&name=%s&type=AAAA",
+        url = g_strdup_printf ("https://%s?ct=application/dns-json&name=%s&type=AAAA",
+                               urls[id],
                                name);
         break;
 

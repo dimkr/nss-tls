@@ -39,6 +39,7 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
                                           int *errnop,
                                           int *h_errnop)
 {
+    static const char *ignored[] = {NSS_TLS_RESOLVER_DOMAINS};
     struct sockaddr_un sun = {.sun_family = AF_UNIX};
     struct timeval tv = {.tv_sec = NSS_TLS_TIMEOUT / 2, .tv_usec = 0};
     struct nss_tls_data *data = (struct nss_tls_data *)buf;
@@ -57,8 +58,10 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
 
     /* must be resolved by other means, otherwise this results in infinite
      * recursion */
-    if (strcmp(name, NSS_TLS_RESOLVER_DOMAIN) == 0)
-        return NSS_STATUS_NOTFOUND;
+    for (i = 0; i < sizeof(ignored) / sizeof(ignored[0]); ++i) {
+        if (strcmp(name, ignored[i]) == 0)
+            return NSS_STATUS_NOTFOUND;
+    }
 
     if (geteuid() == 0)
         strcpy(sun.sun_path, NSS_TLS_SOCKET_PATH);

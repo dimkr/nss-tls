@@ -19,12 +19,28 @@
 project('nss-tls', 'c', version: '0.2', license : ['LGPL2.1+'])
 
 resolver = get_option('resolver')
-
-resolver_domain = resolver
-resolver_tokens = resolver.split('/')
-if resolver_tokens.length() > 0
-    resolver_domain = resolver_tokens[0]
+if resolver == ''
+    resolvers = get_option('resolvers')
+else
+    warning('The resolver build option is deprecated; use resolvers')
+    resolvers = resolver
 endif
+
+resolver_urls = []
+resolver_domains = []
+foreach resolver_url: resolvers.split(',')
+    resolver_tokens = resolver_url.split('/')
+    if resolver_tokens.length() > 0
+        resolver_domain = resolver_tokens[0]
+    else
+        resolver_domain = resolver_url
+    endif
+
+    resolver_domains += ['"@0@"'.format(resolver_domain)]
+    resolver_urls += ['"@0@"'.format(resolver_url)]
+endforeach
+resolver_urls = ','.join(resolver_urls)
+resolver_domains = ','.join(resolver_domains)
 
 nss_tls_socket_name = 'nss-tlsd.sock'
 nss_tls_socket_dir = '@0@/run/nss-tls'.format(get_option('localstatedir'))
@@ -38,8 +54,8 @@ nss_tlsd_path = join_paths(get_option('prefix'),
                            'nss-tlsd')
 
 add_project_arguments(
-    '-DNSS_TLS_RESOLVER="@0@"'.format(resolver),
-    '-DNSS_TLS_RESOLVER_DOMAIN="@0@"'.format(resolver_domain),
+    '-DNSS_TLS_RESOLVER_URLS=@0@'.format(resolver_urls),
+    '-DNSS_TLS_RESOLVER_DOMAINS=@0@'.format(resolver_domains),
     '-DNSS_TLS_SOCKET_NAME="@0@"'.format(nss_tls_socket_name),
     '-DNSS_TLS_SOCKET_DIR="@0@"'.format(nss_tls_socket_dir),
     '-DNSS_TLS_SOCKET_PATH="@0@"'.format(nss_tls_socket_path),

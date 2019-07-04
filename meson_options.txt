@@ -1,4 +1,5 @@
-option('resolver', type: 'string', value: 'cloudflare-dns.com/dns-query')
+option('resolver', type: 'string')
+option('resolvers', type: 'string', value: 'cloudflare-dns.com/dns-query')
 option('timeout', type: 'integer', value: 4)
 option('cache', type: 'boolean')
 option('user', type: 'string', value: 'daemon')

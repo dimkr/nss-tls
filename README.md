@@ -70,21 +70,31 @@ Then, add "tls" to the "hosts" entry in /etc/nsswitch.conf, before "dns" or anyt
 
 This will enable a system nss-tlsd instance for all non-interactive processes (which runs as an unprivileged user) and a private instance of nss-tlsd for each user. Name resolving will happen through nss-tls and DNS will be attempted only if nss-tls fails.
 
-## Choosing a DoH Server
+## Choosing a DoH Servers
 
-By default, nss-tls performs name lookup through [cloudflare-dns.com/dns-query](https://developers.cloudflare.com/1.1.1.1/dns-over-https/).
+By default, nss-tls performs all name lookup through [cloudflare-dns.com/dns-query](https://developers.cloudflare.com/1.1.1.1/dns-over-https/).
 
-To use a different DoH server, use the "resolver" build option:
+To use a different DoH server, use the "resolvers" build option:
 
-    meson configure -Dresolver=dns9.quad9.net/dns-query
+    meson configure -Dresolvers=dns9.quad9.net/dns-query
+
+## Using Multiple DoH Servers
+
+It is also possible to use multiple DoH servers:
+
+    meson configure -Dresolvers=cloudflare-dns.com/dns-query,dns9.quad9.net/dns-query
+
+When nss-tls is configured like this, it pseudo-randomly chooses one of the servers, for each name lookup. The pseudo-random choice of the server is deterministic: if the same domain is resolved twice (e.g. for its IPv4 and IPv6 addresses, respectively), nss-tls will use the same DoH server for both queries. If nss-tlsd is restarted, it will keep using the same DoH server to resolve that domain. This contributes to privacy, since every DoH server sees only a portion of the user's browsing history.
+
+Previously, nss-tls was limited to a single server, specified using the now deprecated "resolver" build option.
 
 ## DoH Without Fallback to DNS
 
-To use nss-tls for name resolving, without falling back to DNS if resolving fails, build nss-tls with a DoH server specified using its address, e.g.:
+To use nss-tls for name resolving, without falling back to DNS if resolving fails, build nss-tls with DoH servers specified using their addresses, e.g.:
 
-    meson configure -Dresolver=1.1.1.1/dns-query
+    meson configure -Dresolvers=1.1.1.1/dns-query,9.9.9.9/dns-query
 
-This way, nss-tls will not depend on other means of name resolving to resolve the DoH server address.
+This way, nss-tls will not depend on other means of name resolving to resolve a DoH server address.
 
 Then, remove all DNS resolvers from the "hosts" entry in /etc/nsswitch.conf and keep "tls".
 
