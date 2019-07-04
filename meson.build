@@ -29,13 +29,7 @@ endif
 resolver_urls = []
 resolver_domains = []
 foreach resolver_url: resolvers.split(',')
-    resolver_tokens = resolver_url.split('/')
-    if resolver_tokens.length() > 0
-        resolver_domain = resolver_tokens[0]
-    else
-        resolver_domain = resolver_url
-    endif
-
+    resolver_domain = resolver_url.split('/')[0]
     resolver_domains += ['"@0@"'.format(resolver_domain)]
     resolver_urls += ['"@0@"'.format(resolver_url)]
 endforeach
