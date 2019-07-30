@@ -47,6 +47,8 @@
 #define FALLBACK_TTL (60 * 1000000)
 #define MIN_TTL 10
 #define CACHE_SIZE 1024
+#define MAX_CONNS_PER_RESOLVER 10
+#define MAX_CONNS MAX_CONNS_PER_RESOLVER * G_N_ELEMENTS (urls)
 
 struct nss_tls_session {
     unsigned char dns[UINT16_MAX];
@@ -54,13 +56,10 @@ struct nss_tls_session {
     struct nss_tls_res response;
     gint64 type;
     GSocketConnection *connection;
-    SoupSession *session;
-    SoupMessage *message;
 };
 
-#ifdef NSS_TLS_DEBUG
-static SoupLogger *logger;
-#endif
+static SoupSession *soup = NULL;
+static const gchar *urls[] = {NSS_TLS_RESOLVER_URLS};
 
 #ifdef NSS_TLS_CACHE
 
@@ -120,7 +119,7 @@ add_to_cache (const struct nss_tls_req *req, struct nss_tls_res *res)
     gint64 now;
     GHashTable *cache;
 
-    cache = choose_cache(req);
+    cache = choose_cache (req);
 
     if (g_hash_table_size (cache) >= CACHE_SIZE) {
         return;
@@ -171,17 +170,47 @@ on_sent (GObject         *source_object,
          gpointer        user_data);
 
 static
+gchar *
+encode_dns_query (const unsigned char *buf, const gsize len)
+{
+    gchar *b64;
+    size_t i;
+
+    b64 = g_base64_encode (buf, len);
+
+    /* https://tools.ietf.org/html/rfc4648#section-5 */
+    for (i = 0; i < strlen (b64); ++i) {
+        switch (b64[i]) {
+        case '+':
+            b64[i] = '-';
+            break;
+
+        case '/':
+            b64[i] = '_';
+            break;
+
+        case '=':
+            b64[i] = '\0';
+            return b64;
+        }
+    }
+
+    return b64;
+}
+
+static
 gboolean
 resolve_domain (struct nss_tls_session *session, const char *name)
 {
-    static unsigned  char buf[512];
-    static const gchar *urls[] = {NSS_TLS_RESOLVER_URLS};
+    static unsigned char buf[512];
     gchar *url, *dns;
-    int type, len;
-    guint id = 0;
-#ifdef NSS_TLS_CACHE
     GOutputStream *out;
     const struct nss_tls_res *res;
+    SoupMessage *msg;
+    int type, len;
+    SoupMessageFlags flags;
+#ifdef NSS_TLS_CACHE
+    guint id = 0;
 
     res = query_cache (&session->request);
     if (res) {
@@ -224,7 +253,7 @@ resolve_domain (struct nss_tls_session *session, const char *name)
         return FALSE;
     }
 
-    dns = g_base64_encode (buf, (gsize)len);
+    dns = encode_dns_query (buf, (gsize)len);
 
     if (G_N_ELEMENTS (urls) > 1) {
         id = g_str_hash (name) % G_N_ELEMENTS (urls);
@@ -236,30 +265,26 @@ resolve_domain (struct nss_tls_session *session, const char *name)
 
     session->type = (gint64)type;
 
-    session->session = soup_session_new_with_options (SOUP_SESSION_TIMEOUT,
-                                                      NSS_TLS_TIMEOUT,
-                                                      SOUP_SESSION_IDLE_TIMEOUT,
-                                                      NSS_TLS_TIMEOUT,
-                                                      SOUP_SESSION_USER_AGENT,
-                                                      NSS_TLS_USER_AGENT,
-                                                      NULL);
-    session->message = soup_message_new ("GET", url);
+    msg = soup_message_new ("GET", url);
 
-    soup_message_headers_append (session->message->request_headers,
+    flags = soup_message_get_flags (msg);
+    soup_message_set_flags (msg, flags | SOUP_MESSAGE_IDEMPOTENT);
+
+    soup_message_headers_append (msg->request_headers,
                                  "Content-Type",
                                  "application/dns-message");
-    soup_message_headers_append (session->message->request_headers,
+    soup_message_headers_append (msg->request_headers,
                                  "Accept",
                                  "application/dns-message");
-#ifdef NSS_TLS_DEBUG
-    soup_session_add_feature (session->session, SOUP_SESSION_FEATURE (logger));
-#endif
 
-    soup_session_send_async (session->session,
-                             session->message,
+    soup_session_send_async (soup,
+                             msg,
                              NULL,
                              on_response,
                              session);
+
+    g_object_unref (msg);
+
     g_free (url);
     g_free (dns);
 
@@ -270,9 +295,6 @@ static
 void
 resolve_cname (struct nss_tls_session *session)
 {
-    session->session = NULL;
-    session->message = NULL;
-
     resolve_domain (session, session->response.cname);
 }
 
@@ -285,11 +307,6 @@ on_close (GObject       *source_object,
     struct nss_tls_session *session = (struct nss_tls_session *)user_data;
 
     g_io_stream_close_finish (G_IO_STREAM (source_object), res, NULL);
-
-    if (session->session) {
-        soup_session_abort (session->session);
-        g_object_unref (session->session);
-    }
 
     g_object_unref (session->connection);
 
@@ -370,7 +387,9 @@ on_body (GObject         *source_object,
 
     count = ns_msg_count(msg, ns_s_an);
     for (id = 0;
-         (id < count) && ((session->response.count < NSS_TLS_ADDRS_MAX) || !session->response.cname);
+         ((id < count) &&
+          ((session->response.count < G_N_ELEMENTS (session->response.addrs)) ||
+          !session->response.cname));
          ++id) {
         if (ns_parserr (&msg, ns_s_an, id, &rr) < 0) {
             g_warning ("Failed to parse a result record for %s",
@@ -423,11 +442,14 @@ on_body (GObject         *source_object,
     if (session->response.cname[0] && (session->response.count == 0)) {
         resolve_cname (session);
         return;
-    } else if (session->response.count > 0) {
+    }
+
 #ifdef NSS_TLS_CACHE
-        add_to_cache (&session->request, &session->response);
+    /* we want to cache addresses or the lack of any addresses */
+    add_to_cache (&session->request, &session->response);
 #endif
 
+    if (session->response.count > 0) {
         out = g_io_stream_get_output_stream (G_IO_STREAM (session->connection));
         g_output_stream_write_all_async (out,
                                          &session->response,
@@ -449,15 +471,8 @@ cleanup:
         g_error_free (err);
     }
 
-
-    g_object_unref (session->message);
-    session->message = NULL;
-
-    if (session->response.count == 0)
+    if (session->response.count == 0) {
         stop_session (session);
-    else {
-        g_object_unref (session->session);
-        session->session = NULL;
     }
 }
 
@@ -495,6 +510,9 @@ on_response (GObject         *source_object,
                                    NULL,
                                    on_body,
                                    session);
+
+    g_object_unref (in);
+
     return;
 
 cleanup:
@@ -506,20 +524,8 @@ cleanup:
         g_object_unref (in);
     }
 
-    g_object_unref (session->message);
-    session->message = NULL;
-
-    if (session->response.count == 0)
+    if (session->response.count == 0) {
         stop_session (session);
-    else {
-        /*
-         * if we found any addresses, we close the session now instead of doing
-         * this in stop_session() once we're done sending passing the results to
-         * the client, to keep the number of open file descriptors as low as
-         * possible
-         */
-        g_object_unref (session->session);
-        session->session = NULL;
     }
 }
 
@@ -533,9 +539,6 @@ on_request (GObject         *source_object,
     GError *err = NULL;
     struct nss_tls_session *session = user_data;
     gsize len;
-
-    session->session = NULL;
-    session->message = NULL;
 
     if (!g_input_stream_read_all_finish (G_INPUT_STREAM (source_object),
                                          res,
@@ -616,6 +619,9 @@ int main (int argc, char **argv)
     const gchar *runtime_dir;
     struct passwd *user;
     gchar *user_socket = root_socket;
+#ifdef NSS_TLS_DEBUG
+    static SoupLogger *logger;
+#endif
     int mode = 0600;
     gint i;
     uid_t uid;
@@ -692,6 +698,22 @@ int main (int argc, char **argv)
     }
 #endif
 
+    soup = soup_session_new_with_options (SOUP_SESSION_TIMEOUT,
+                                          NSS_TLS_TIMEOUT,
+                                          SOUP_SESSION_IDLE_TIMEOUT,
+                                          NSS_TLS_TIMEOUT,
+                                          SOUP_SESSION_USER_AGENT,
+                                          NSS_TLS_USER_AGENT,
+                                          SOUP_SESSION_MAX_CONNS_PER_HOST,
+                                          MAX_CONNS_PER_RESOLVER,
+                                          SOUP_SESSION_MAX_CONNS,
+                                          MAX_CONNS,
+                                          NULL);
+#ifdef NSS_TLS_DEBUG
+    logger = soup_logger_new (SOUP_LOGGER_LOG_BODY, 128);
+    soup_session_add_feature (soup, SOUP_SESSION_FEATURE (logger));
+#endif
+
     g_socket_listener_add_address (G_SOCKET_LISTENER (s),
                                    sa,
                                    G_SOCKET_TYPE_STREAM,
@@ -709,10 +731,6 @@ int main (int argc, char **argv)
 
     g_unix_signal_add (SIGINT, on_term, loop);
     g_unix_signal_add (SIGTERM, on_term, loop);
-
-#ifdef NSS_TLS_DEBUG
-    logger = soup_logger_new (SOUP_LOGGER_LOG_BODY, 128);
-#endif
 
     g_main_loop_run (loop);
 
