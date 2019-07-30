@@ -16,16 +16,9 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-project('nss-tls', 'c', version: '0.2', license : ['LGPL2.1+'])
+project('nss-tls', 'c', version: '1.0', license : ['LGPL2.1+'])
 
-resolver = get_option('resolver')
-if resolver == ''
-    resolvers = get_option('resolvers')
-else
-    warning('The resolver build option is deprecated; use resolvers')
-    resolvers = resolver
-endif
-
+resolvers = get_option('resolvers')
 resolver_urls = []
 resolver_domains = []
 foreach resolver_url: resolvers.split(',')
