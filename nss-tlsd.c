@@ -598,7 +598,9 @@ int main (int argc, char **argv)
     struct passwd *user;
     gchar *user_socket = root_socket;
     int mode = 0600;
+#ifdef NSS_TLS_CACHE
     gint i;
+#endif
     uid_t uid;
     gid_t gid;
     gboolean root;
