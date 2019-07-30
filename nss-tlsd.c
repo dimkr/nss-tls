@@ -263,6 +263,7 @@ resolve_domain (struct nss_tls_session *session, const char *name)
 
     g_debug ("Fetching %s", url);
 
+    session->response.cname[0] = '\0';
     session->type = (gint64)type;
 
     msg = soup_message_new ("GET", url);
@@ -343,20 +344,86 @@ on_sent (GObject         *source_object,
 
 static
 void
+on_answer (struct nss_tls_session   *session,
+           const unsigned char      *dns,
+           const gsize              len,
+           ns_msg                   *msg,
+           const int                rr_id,
+           const int                a_type,
+           const size_t             addrlen)
+{
+    ns_rr rr;
+    gint64 ttl, now, expiry;
+    int type;
+
+    if (ns_parserr (msg, ns_s_an, rr_id, &rr) < 0) {
+        g_warning ("Failed to parse a result record for %s",
+                   session->request.name);
+        return;
+    }
+
+    if (ns_rr_class (rr) != ns_c_in)
+        return;
+
+    type = ns_rr_type (rr);
+    if (type == a_type) {
+        if (ns_rr_rdlen (rr) == addrlen) {
+            memcpy (&session->response.addrs[session->response.count],
+                    ns_rr_rdata (rr),
+                    addrlen);
+            ++session->response.count;
+
+            ttl = (gint64)ns_rr_ttl (rr);
+            if (ttl <= INT64_MAX / 1000000) {
+                if (ttl < MIN_TTL)
+                    ttl = MIN_TTL;
+                ttl *= 1000000;
+                now = g_get_monotonic_time ();
+
+                /*
+                 * after looking at all answer records, we use the shortest
+                 * TTL for all answers
+                 */
+                if (INT64_MAX - ttl >= now) {
+                    expiry = (int64_t)(now + ttl);
+                    if ((session->response.expiry == -1) ||
+                        (expiry < session->response.expiry)) {
+                        session->response.expiry = expiry;
+                    }
+                }
+            }
+        }
+    }
+    else if ((type == ns_t_cname) &&
+             !session->response.cname[0] &&
+             (ns_rr_rdlen (rr) > 0)) {
+        if (dn_expand (dns,
+                       dns + len,
+                       ns_rr_rdata (rr),
+                       session->response.cname,
+                       sizeof (session->response.cname)) > 0) {
+            g_debug ("The canonical name of %s is %s",
+                     session->request.name,
+                     session->response.cname);
+        } else {
+            session->response.cname[0] = '\0';
+        }
+    }
+}
+
+static
+void
 on_body (GObject         *source_object,
          GAsyncResult    *res,
          gpointer        user_data)
 {
     ns_msg msg;
-    ns_rr rr;
     GError *err = NULL;
     struct nss_tls_session *session = (struct nss_tls_session *)user_data;
     GOutputStream *out;
-    const unsigned char *dns;
-    gint64 ttl, now, expiry;
     gsize len;
     size_t addrlen;
-    int id, count, type, a_type;
+    int id, count, a_type;
 
     if (!g_input_stream_read_all_finish (G_INPUT_STREAM (source_object),
                                          res,
@@ -391,52 +458,7 @@ on_body (GObject         *source_object,
           ((session->response.count < G_N_ELEMENTS (session->response.addrs)) ||
           !session->response.cname));
          ++id) {
-        if (ns_parserr (&msg, ns_s_an, id, &rr) < 0) {
-            g_warning ("Failed to parse a result record for %s",
-                       session->request.name);
-            continue;
-        }
-
-        if (ns_rr_class (rr) != ns_c_in)
-            continue;
-
-        type = ns_rr_type (rr);
-        if (type == a_type) {
-            if (ns_rr_rdlen (rr) == addrlen) {
-                memcpy (&session->response.addrs[session->response.count],
-                        ns_rr_rdata (rr),
-                        addrlen);
-                ++session->response.count;
-
-                ttl = (gint64)ns_rr_ttl (rr);
-                if (ttl <= INT64_MAX / 1000000) {
-                    if (ttl < MIN_TTL)
-                        ttl = MIN_TTL;
-                    ttl *= 1000000;
-                    now = g_get_monotonic_time ();
-
-                    /*
-                     * after looking at all answer records, we use the shortest
-                     * TTL for all answers
-                     */
-                    if (INT64_MAX - ttl >= now) {
-                        expiry = (int64_t)(now + ttl);
-                        if ((session->response.expiry == -1) ||
-                            (expiry < session->response.expiry)) {
-                            session->response.expiry = expiry;
-                        }
-                    }
-                }
-            }
-        }
-        else if ((type == ns_t_cname) && (ns_rr_rdlen (rr) > 0)) {
-            if (dn_expand (dns,
-                           dns + len,
-                           ns_rr_rdata (rr),
-                           session->response.cname,
-                           sizeof (session->response.cname)) <= 0)
-                session->response.cname[0] = '\0';
-        }
+        on_answer (session, session->dns, len, &msg, id, a_type, addrlen);
     }
 
     if (session->response.cname[0] && (session->response.count == 0)) {
