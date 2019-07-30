@@ -39,7 +39,6 @@
 #include <gio/gunixsocketaddress.h>
 #include <gmodule.h>
 #include <libsoup/soup.h>
-#include <json-glib/json-glib.h>
 
 #include "nss-tls.h"
 
