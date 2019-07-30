@@ -440,12 +440,12 @@ on_body (GObject         *source_object,
     switch (session->request.af) {
     case AF_INET:
         a_type = ns_t_a;
-        addrlen = sizeof(session->response.addrs[0].in);
+        addrlen = sizeof (session->response.addrs[0].in);
         break;
 
     case AF_INET6:
         a_type = ns_t_aaaa;
-        addrlen = sizeof(session->response.addrs[0].in6);
+        addrlen = sizeof (session->response.addrs[0].in6);
         break;
 
     default:
@@ -461,7 +461,7 @@ on_body (GObject         *source_object,
     for (id = 0;
          ((id < count) &&
           ((session->response.count < G_N_ELEMENTS (session->response.addrs)) ||
-          !session->response.cname));
+          !session->response.cname[0]));
          ++id) {
         on_answer (session, session->dns, len, &msg, id, a_type, addrlen);
     }
@@ -556,6 +556,31 @@ cleanup:
     }
 }
 
+static
+gboolean
+is_suffixed (const gchar *name)
+{
+    struct __res_state res;
+    gchar *suffix;
+    gboolean ret;
+    unsigned int i;
+
+    if (res_ninit (&res) < 0) {
+        return FALSE;
+    }
+
+    for (i = 0; (i < G_N_ELEMENTS (res.dnsrch)) && res.dnsrch[i]; ++i) {
+        suffix = g_strconcat(".", res.dnsrch[i], NULL);
+        ret = g_str_has_suffix (name, suffix);
+        g_free (suffix);
+        if (ret) {
+            return ret;
+        }
+    }
+
+    return FALSE;
+}
+
 /* step 2: we received a request from libnss_tls and send a HTTPS request */
 static
 void
@@ -587,6 +612,11 @@ on_request (GObject         *source_object,
     }
 
     session->request.name[sizeof (session->request.name) - 1] = '\0';
+
+    if (is_suffixed (session->request.name)) {
+        g_debug ("%s is suffixed by a local domain", session->request.name);
+        goto fail;
+    }
 
     if (resolve_domain (session, session->request.name)) {
         return;
