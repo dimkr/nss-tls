@@ -29,6 +29,8 @@
 #include <errno.h>
 #include <limits.h>
 #include <string.h>
+#include <netinet/in.h>
+#include <resolv.h>
 
 #include <glib.h>
 #include <glib/gstdio.h>
@@ -47,6 +49,7 @@
 #define CACHE_SIZE 1024
 
 struct nss_tls_session {
+    unsigned char dns[UINT16_MAX];
     struct nss_tls_req request;
     struct nss_tls_res response;
     gint64 type;
@@ -54,6 +57,10 @@ struct nss_tls_session {
     SoupSession *session;
     SoupMessage *message;
 };
+
+#ifdef NSS_TLS_DEBUG
+static SoupLogger *logger;
+#endif
 
 #ifdef NSS_TLS_CACHE
 
@@ -167,8 +174,10 @@ static
 gboolean
 resolve_domain (struct nss_tls_session *session, const char *name)
 {
+    static unsigned  char buf[512];
     static const gchar *urls[] = {NSS_TLS_RESOLVER_URLS};
-    gchar *url;
+    gchar *url, *dns;
+    int type, len;
     guint id = 0;
 #ifdef NSS_TLS_CACHE
     GOutputStream *out;
@@ -189,32 +198,43 @@ resolve_domain (struct nss_tls_session *session, const char *name)
     }
 #endif
 
-    if (G_N_ELEMENTS (urls) > 1) {
-        id = g_str_hash (name) % G_N_ELEMENTS (urls);
-    }
-
     switch (session->request.af) {
     case AF_INET:
-        /* A */
-        session->type = 1;
-        url = g_strdup_printf ("https://%s?ct=application/dns-json&name=%s&type=A",
-                               urls[id],
-                               name);
+        type = ns_t_a;
         break;
 
     case AF_INET6:
-        /* AAAA */
-        session->type = 28;
-        url = g_strdup_printf ("https://%s?ct=application/dns-json&name=%s&type=AAAA",
-                               urls[id],
-                               name);
+        type = ns_t_aaaa;
         break;
 
     default:
         return FALSE;
     }
 
+    len = res_mkquery (QUERY,
+                       name,
+                       ns_c_in,
+                       type,
+                       NULL,
+                       0,
+                       NULL,
+                       buf,
+                       sizeof (buf));
+    if (len <= 0) {
+        return FALSE;
+    }
+
+    dns = g_base64_encode (buf, (gsize)len);
+
+    if (G_N_ELEMENTS (urls) > 1) {
+        id = g_str_hash (name) % G_N_ELEMENTS (urls);
+    }
+
+    url = g_strdup_printf ("https://%s?dns=%s", urls[id], dns);
+
     g_debug ("Fetching %s", url);
+
+    session->type = (gint64)type;
 
     session->session = soup_session_new_with_options (SOUP_SESSION_TIMEOUT,
                                                       NSS_TLS_TIMEOUT,
@@ -225,12 +245,23 @@ resolve_domain (struct nss_tls_session *session, const char *name)
                                                       NULL);
     session->message = soup_message_new ("GET", url);
 
+    soup_message_headers_append (session->message->request_headers,
+                                 "Content-Type",
+                                 "application/dns-message");
+    soup_message_headers_append (session->message->request_headers,
+                                 "Accept",
+                                 "application/dns-message");
+#ifdef NSS_TLS_DEBUG
+    soup_session_add_feature (session->session, SOUP_SESSION_FEATURE (logger));
+#endif
+
     soup_session_send_async (session->session,
                              session->message,
                              NULL,
                              on_response,
                              session);
     g_free (url);
+    g_free (dns);
 
     return TRUE;
 }
@@ -295,157 +326,99 @@ on_sent (GObject         *source_object,
 
 static
 void
-on_answer (JsonArray    *array,
-           guint        index_,
-           JsonNode     *element_node,
-           gpointer     user_data)
+on_body (GObject         *source_object,
+         GAsyncResult    *res,
+         gpointer        user_data)
 {
-    struct nss_tls_session *session = (struct nss_tls_session *)user_data;
-    JsonObject *answero;
-    const gchar *data, *cname;
-    void *dst = &session->response.addrs[session->response.count].in;
-    gint64 type, ttl, now;
-    int64_t expiry;
-
-    if (session->response.count >= NSS_TLS_ADDRS_MAX) {
-        return;
-    }
-
-    answero = json_node_get_object (element_node);
-
-    if (!json_object_has_member (answero, "type")) {
-        g_warning ("No type member for %s", session->request.name);
-        return;
-    }
-
-    /* if the type doesn't match, it's OK - continue to the next answer */
-    type = json_object_get_int_member (answero, "type");
-    if (type != session->type) {
-        if (type == 5) {
-            cname = json_object_get_string_member (answero, "data");
-            if (cname && strcmp(cname, session->request.name)) {
-                g_debug ("The canonical name of %s is %s",
-                         session->request.name,
-                         cname);
-                g_strlcpy (session->response.cname,
-                           cname,
-                           sizeof (session->response.cname));
-            } else {
-                session->response.cname[0] = '\0';
-            }
-        }
-        return;
-    }
-
-    if (!json_object_has_member (answero, "data")) {
-        g_debug ("No data for answer %u of %s", index_, session->request.name);
-        return;
-    }
-
-    data = json_object_get_string_member (answero, "data");
-    if (!data) {
-        g_debug ("Invalid data for answer %u of %s",
-                 index_,
-                 session->request.name);
-        return;
-    }
-
-    if (session->request.af == AF_INET6) {
-        dst = &session->response.addrs[session->response.count].in6;
-    }
-
-    if (inet_pton (session->request.af, data, dst)) {
-        ++session->response.count;
-    }
-
-    if (!json_object_has_member (answero, "TTL")) {
-        return;
-    }
-
-    /*
-     * after looking at all answer records, we use the shortest TTL for all
-     * answers
-     */
-    ttl = json_object_get_int_member (answero, "TTL");
-    if (ttl <= INT64_MAX / 1000000) {
-        if (ttl < MIN_TTL) {
-            ttl = MIN_TTL;
-        }
-        ttl *= 1000000;
-        now = g_get_monotonic_time ();
-
-        if (INT64_MAX - ttl >= now) {
-            expiry = (int64_t)(now + ttl);
-            if ((session->response.expiry == -1) ||
-                (expiry < session->response.expiry)) {
-                session->response.expiry = expiry;
-            }
-        }
-    }
-}
-
-/* step 3: we received the HTTPS response, parse it to construct our response
- * and send it to libnss_tls */
-static
-void
-on_response (GObject         *source_object,
-             GAsyncResult    *res,
-             gpointer        user_data)
-{
+    ns_msg msg;
+    ns_rr rr;
     GError *err = NULL;
     struct nss_tls_session *session = (struct nss_tls_session *)user_data;
-    GInputStream *in;
-    JsonParser *j = NULL;
-    JsonNode *root;
-    JsonObject *rooto;
-    JsonArray *answers;
     GOutputStream *out;
+    const unsigned char *dns;
+    gint64 ttl, now, expiry;
+    gsize len;
+    size_t addrlen;
+    int id, count, type, a_type;
 
-    in = soup_session_send_finish (SOUP_SESSION (source_object),
-                                   res,
-                                   &err);
-    if (!in) {
-        if (err) {
-            g_warning ("Failed to session %s: %s",
-                       session->request.name,
-                       err->message);
-        }
-        else {
-            g_warning ("Failed to session %s", session->request.name);
-        }
+    if (!g_input_stream_read_all_finish (G_INPUT_STREAM (source_object),
+                                         res,
+                                         &len,
+                                         &err)) {
         goto cleanup;
     }
 
-    j = json_parser_new ();
-    if (!json_parser_load_from_stream (j, in, NULL, &err)) {
-        if (err) {
-            g_warning ("Failed to parse the result for %s: %s",
-                       session->request.name,
-                       err->message);
-        }
-        else {
-            g_warning ("Failed to parse the result for %s",
+    switch (session->request.af) {
+    case AF_INET:
+        a_type = ns_t_a;
+        addrlen = sizeof(session->response.addrs[0].in);
+        break;
+
+    case AF_INET6:
+        a_type = ns_t_aaaa;
+        addrlen = sizeof(session->response.addrs[0].in6);
+        break;
+
+    default:
+        goto cleanup;
+    }
+
+    if (ns_initparse (session->dns, (int)len, &msg) < 0) {
+        g_warning ("Failed to parse the result for %s", session->request.name);
+        goto cleanup;
+    }
+
+    count = ns_msg_count(msg, ns_s_an);
+    for (id = 0;
+         (id < count) && ((session->response.count < NSS_TLS_ADDRS_MAX) || !session->response.cname);
+         ++id) {
+        if (ns_parserr (&msg, ns_s_an, id, &rr) < 0) {
+            g_warning ("Failed to parse a result record for %s",
                        session->request.name);
+            continue;
         }
-        goto cleanup;
-    }
 
-    root = json_parser_get_root (j);
-    rooto = json_node_get_object (root);
-    if (!rooto) {
-        g_warning ("No root object for %s", session->request.name);
-        goto cleanup;
-    }
+        if (ns_rr_class (rr) != ns_c_in)
+            continue;
 
-    if (!json_object_has_member (rooto, "Answer")) {
-#ifdef NSS_TLS_CACHE
-        add_to_cache (&session->request, &session->response);
-#endif
-        goto cleanup;
-    }
-    answers = json_object_get_array_member (rooto, "Answer");
+        type = ns_rr_type (rr);
+        if (type == a_type) {
+            if (ns_rr_rdlen (rr) == addrlen) {
+                memcpy (&session->response.addrs[session->response.count],
+                        ns_rr_rdata (rr),
+                        addrlen);
+                ++session->response.count;
 
-    json_array_foreach_element (answers, on_answer, session);
+                ttl = (gint64)ns_rr_ttl (rr);
+                if (ttl <= INT64_MAX / 1000000) {
+                    if (ttl < MIN_TTL)
+                        ttl = MIN_TTL;
+                    ttl *= 1000000;
+                    now = g_get_monotonic_time ();
+
+                    /*
+                     * after looking at all answer records, we use the shortest
+                     * TTL for all answers
+                     */
+                    if (INT64_MAX - ttl >= now) {
+                        expiry = (int64_t)(now + ttl);
+                        if ((session->response.expiry == -1) ||
+                            (expiry < session->response.expiry)) {
+                            session->response.expiry = expiry;
+                        }
+                    }
+                }
+            }
+        }
+        else if ((type == ns_t_cname) && (ns_rr_rdlen (rr) > 0)) {
+            if (dn_expand (dns,
+                           dns + len,
+                           ns_rr_rdata (rr),
+                           session->response.cname,
+                           sizeof (session->response.cname)) <= 0)
+                session->response.cname[0] = '\0';
+        }
+    }
 
     if (session->response.cname[0] && (session->response.count == 0)) {
         resolve_cname (session);
@@ -472,10 +445,59 @@ on_response (GObject         *source_object,
     }
 
 cleanup:
-    if (j) {
-        g_object_unref (j);
+    if (err) {
+        g_error_free (err);
     }
 
+
+    g_object_unref (session->message);
+    session->message = NULL;
+
+    if (session->response.count == 0)
+        stop_session (session);
+    else {
+        g_object_unref (session->session);
+        session->session = NULL;
+    }
+}
+
+/* step 3: we received the HTTPS response, parse it to construct our response
+ * and send it to libnss_tls */
+static
+void
+on_response (GObject         *source_object,
+             GAsyncResult    *res,
+             gpointer        user_data)
+{
+    GError *err = NULL;
+    struct nss_tls_session *session = (struct nss_tls_session *)user_data;
+    GInputStream *in = NULL;
+
+    in = soup_session_send_finish (SOUP_SESSION (source_object),
+                                   res,
+                                   &err);
+    if (!in) {
+        if (err) {
+            g_warning ("Failed to query %s: %s",
+                       session->request.name,
+                       err->message);
+        }
+        else {
+            g_warning ("Failed to query %s", session->request.name);
+        }
+        goto cleanup;
+    }
+
+    g_input_stream_read_all_async (in,
+                                   session->dns,
+                                   sizeof (session->dns),
+                                   G_PRIORITY_DEFAULT,
+                                   NULL,
+                                   on_body,
+                                   session);
+    return;
+
+cleanup:
     if (err) {
         g_error_free (err);
     }
@@ -487,14 +509,15 @@ cleanup:
     g_object_unref (session->message);
     session->message = NULL;
 
-    if (session->response.count == 0) {
+    if (session->response.count == 0)
         stop_session (session);
-    }
     else {
-        /* if we found any addresses, we close the session now instead of doing
+        /*
+         * if we found any addresses, we close the session now instead of doing
          * this in stop_session() once we're done sending passing the results to
          * the client, to keep the number of open file descriptors as low as
-         * possible */
+         * possible
+         */
         g_object_unref (session->session);
         session->session = NULL;
     }
@@ -686,6 +709,10 @@ int main (int argc, char **argv)
 
     g_unix_signal_add (SIGINT, on_term, loop);
     g_unix_signal_add (SIGTERM, on_term, loop);
+
+#ifdef NSS_TLS_DEBUG
+    logger = soup_logger_new (SOUP_LOGGER_LOG_BODY, 128);
+#endif
 
     g_main_loop_run (loop);
 

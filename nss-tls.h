@@ -20,18 +20,19 @@
 
 #include <inttypes.h>
 #include <netinet/in.h>
+#include <arpa/nameser.h>
 
 #define NSS_TLS_ADDRS_MAX 16
 
 struct nss_tls_req {
     int af;
-    char name[256];
+    char name[NS_MAXDNAME];
 } __attribute__((packed));
 
 struct nss_tls_res {
     uint8_t count;
     int64_t expiry;
-    char cname[256];
+    char cname[NS_MAXDNAME];
     union {
         struct in_addr in;
         struct in6_addr in6;

@@ -64,9 +64,14 @@ if get_option('cache')
     add_project_arguments('-DNSS_TLS_CACHE', language: 'c')
 endif
 
+if get_option('buildtype').startswith('debug')
+    add_project_arguments('-DNSS_TLS_DEBUG', language: 'c')
+endif
+
 nss_tlsd = executable('nss-tlsd',
                       'nss-tlsd.c',
                       dependencies: [
+                          meson.get_compiler('c').find_library('resolv'),
                           dependency('glib-2.0', version: '>=2.44'),
                           dependency('gio-2.0'),
                           dependency('gio-unix-2.0'),
