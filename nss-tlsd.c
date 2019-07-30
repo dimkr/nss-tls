@@ -100,9 +100,9 @@ on_cache_cleanup (gpointer user_data)
 
 static
 GHashTable *
-choose_cache (const struct nss_tls_req *req)
+choose_cache (const int af)
 {
-    if (req->af == AF_INET) {
+    if (af == AF_INET) {
         return caches[0];
     }
 
@@ -118,7 +118,7 @@ add_to_cache (const struct nss_tls_req *req, struct nss_tls_res *res)
     gint64 now;
     GHashTable *cache;
 
-    cache = choose_cache (req);
+    cache = choose_cache (req->af);
 
     if (!cache || (g_hash_table_size (cache) >= CACHE_SIZE)) {
         return;
@@ -142,20 +142,48 @@ add_to_cache (const struct nss_tls_req *req, struct nss_tls_res *res)
 
 static
 const struct nss_tls_res *
-query_cache (const struct nss_tls_req *req)
+query_cache (const int af, const char *name)
 {
     gpointer res = NULL;
     GHashTable *cache;
 
-    cache = choose_cache (req);
+    cache = choose_cache (af);
     if (cache) {
-        res = g_hash_table_lookup (choose_cache (req), req->name);
+        res = g_hash_table_lookup (cache, name);
         if (res) {
-            g_debug ("Found %s in the cache", req->name);
+            g_debug ("Found %s in the cache", name);
         }
     }
 
     return (const struct nss_tls_res *)res;
+}
+
+static
+gboolean
+get_cached_response (struct nss_tls_session *session)
+{
+    const struct nss_tls_res *res, *cres;
+
+    res = query_cache (session->request.af, session->request.name);
+    if (!res) {
+        return FALSE;
+    }
+
+    if (res->cname[0]) {
+        cres = query_cache (session->request.af, res->cname);
+        if (cres) {
+            memcpy (session->response.addrs,
+                    cres->addrs,
+                    cres->count * sizeof(cres->addrs[0]));
+            session->response.count = cres->count;
+            session->response.expiry = cres->expiry;
+            strcpy (session->response.cname, res->cname);
+            return TRUE;
+        }
+    }
+
+    memcpy (&session->response, res, sizeof (session->response));
+    return TRUE;
 }
 
 #endif
@@ -203,23 +231,22 @@ encode_dns_query (const unsigned char *buf, const gsize len)
 
 static
 gboolean
-resolve_domain (struct nss_tls_session *session, const char *name)
+resolve_domain (struct nss_tls_session *session)
 {
     static unsigned char buf[512];
     gchar *url, *dns;
 #ifdef NSS_TLS_CACHE
     GOutputStream *out;
-    const struct nss_tls_res *res;
 #endif
     SoupMessage *msg;
     int type, len;
     SoupMessageFlags flags;
     guint id = 0;
 
+    g_debug ("Resolving %s", session->request.name);
+
 #ifdef NSS_TLS_CACHE
-    res = query_cache (&session->request);
-    if (res) {
-        memcpy (&session->response, res, sizeof (session->response));
+    if (get_cached_response (session)) {
         out = g_io_stream_get_output_stream (G_IO_STREAM (session->connection));
         g_output_stream_write_all_async (out,
                                          &session->response,
@@ -246,7 +273,7 @@ resolve_domain (struct nss_tls_session *session, const char *name)
     }
 
     len = res_mkquery (QUERY,
-                       name,
+                       session->request.name,
                        ns_c_in,
                        type,
                        NULL,
@@ -261,12 +288,10 @@ resolve_domain (struct nss_tls_session *session, const char *name)
     dns = encode_dns_query (buf, (gsize)len);
 
     if (G_N_ELEMENTS (urls) > 1) {
-        id = g_str_hash (name) % G_N_ELEMENTS (urls);
+        id = g_str_hash (session->request.name) % G_N_ELEMENTS (urls);
     }
 
     url = g_strdup_printf ("https://%s?dns=%s", urls[id], dns);
-
-    g_debug ("Fetching %s", url);
 
     session->response.cname[0] = '\0';
     session->type = (gint64)type;
@@ -301,7 +326,8 @@ static
 void
 resolve_cname (struct nss_tls_session *session)
 {
-    resolve_domain (session, session->response.cname);
+    strcpy (session->request.name, session->response.cname);
+    resolve_domain (session);
 }
 
 static
@@ -466,15 +492,15 @@ on_body (GObject         *source_object,
         on_answer (session, session->dns, len, &msg, id, a_type, addrlen);
     }
 
-    if (session->response.cname[0] && (session->response.count == 0)) {
-        resolve_cname (session);
-        return;
-    }
-
 #ifdef NSS_TLS_CACHE
     /* we want to cache addresses or the lack of any addresses */
     add_to_cache (&session->request, &session->response);
 #endif
+
+    if (session->response.cname[0] && (session->response.count == 0)) {
+        resolve_cname (session);
+        return;
+    }
 
     if (session->response.count > 0) {
         out = g_io_stream_get_output_stream (G_IO_STREAM (session->connection));
@@ -618,7 +644,7 @@ on_request (GObject         *source_object,
         goto fail;
     }
 
-    if (resolve_domain (session, session->request.name)) {
+    if (resolve_domain (session)) {
         return;
     }
 
