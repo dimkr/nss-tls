@@ -203,14 +203,16 @@ resolve_domain (struct nss_tls_session *session, const char *name)
 {
     static unsigned char buf[512];
     gchar *url, *dns;
+#ifdef NSS_TLS_CACHE
     GOutputStream *out;
     const struct nss_tls_res *res;
+#endif
     SoupMessage *msg;
     int type, len;
     SoupMessageFlags flags;
-#ifdef NSS_TLS_CACHE
     guint id = 0;
 
+#ifdef NSS_TLS_CACHE
     res = query_cache (&session->request);
     if (res) {
         memcpy (&session->response, res, sizeof (session->response));
@@ -644,11 +646,11 @@ int main (int argc, char **argv)
     static SoupLogger *logger;
 #endif
     int mode = 0600;
-    gint i;
     uid_t uid;
     gid_t gid;
     gboolean root;
 #ifdef NSS_TLS_CACHE
+    gint i;
     gboolean cache = TRUE;
 #endif
 
