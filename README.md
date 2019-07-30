@@ -36,13 +36,14 @@ Users who don't have such a private instance will continue to use the system-wid
 
 Also, nss-tls is capable of using multiple DoH servers, with a deterministic algorithm that chooses which server to use to resolve a domain. This way, no DoH server can track the user's entire browsing history.
 
+To avoid bloat, duplicate effort and potential remotely-exploitable vulnerabilities, nss-tls use the libc API for building DNS queries and parsing responses, instead of implementing its own parser.
+
 ## Dependencies
 
 nss-tls depends on:
 * [glibc](https://www.gnu.org/software/libc/)
 * [GLib](https://wiki.gnome.org/Projects/GLib)
 * [libsoup](https://wiki.gnome.org/Projects/libsoup)
-* [JSON-GLib](https://wiki.gnome.org/Projects/JsonGlib)
 
 If [systemd](https://www.freedesktop.org/wiki/Software/systemd/) is present, the installation of nss-tls includes unit files for nss-tlsd.
 
@@ -102,19 +103,19 @@ Then, remove all DNS resolvers from the "hosts" entry in /etc/nsswitch.conf and 
 
 ## Performance
 
-DNS over HTTPS is much slower than DNS. Therefore, by default, each user's nss-tls instance maintains an internal cache of lookup results.
+DNS over HTTPS is much slower than DNS. Therefore, each nss-tls instance keeps established HTTPS connections open and reuses them.
 
-However, one may wish to use a system-wide cache; nscd(8) can do that.
+Also, by default, each user's nss-tls instance maintains an internal cache of lookup results.
 
 To disable the internal cache, use the "cache" build option:
 
     meson configure -Dcache=false
 
-To enable system-wide DNS cache on [Debian](http://www.debian.org/) and derivatives:
+One may wish to use a system-wide cache that also covers DNS, instead of the internal cache of nss-tls; nscd(8) can do that. To enable system-wide cache on [Debian](http://www.debian.org/) and derivatives:
 
     apt install unscd
 
-Set "enable-cache" for "hosts" to "yes" in /etc/nscd.conf. Then:
+Then, set "enable-cache" for "hosts" to "yes" in /etc/nscd.conf. Then:
 
     systemctl enable unscd
     systemctl start unscd
