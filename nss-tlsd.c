@@ -144,11 +144,15 @@ static
 const struct nss_tls_res *
 query_cache (const struct nss_tls_req *req)
 {
-    gpointer res;
+    gpointer res = NULL;
+    GHashTable *cache;
 
-    res = g_hash_table_lookup (choose_cache (req), req->name);
-    if (res) {
-        g_debug ("Found %s in the cache", req->name);
+    cache = choose_cache (req);
+    if (cache) {
+        res = g_hash_table_lookup (choose_cache (req), req->name);
+        if (res) {
+            g_debug ("Found %s in the cache", req->name);
+        }
     }
 
     return (const struct nss_tls_res *)res;
