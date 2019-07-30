@@ -57,7 +57,7 @@ struct nss_tls_session {
 
 #ifdef NSS_TLS_CACHE
 
-static GHashTable *caches[2];
+static GHashTable *caches[2] = {NULL, NULL};
 
 static
 gboolean
@@ -115,7 +115,7 @@ add_to_cache (const struct nss_tls_req *req, struct nss_tls_res *res)
 
     cache = choose_cache(req);
 
-    if (g_hash_table_size (cache) >= CACHE_SIZE) {
+    if (!cache || (g_hash_table_size (cache) >= CACHE_SIZE)) {
         return;
     }
 
@@ -141,7 +141,7 @@ query_cache (const struct nss_tls_req *req)
 {
     gpointer res;
 
-    res = g_hash_table_lookup (choose_cache(req), req->name);
+    res = g_hash_table_lookup (choose_cache (req), req->name);
     if (res) {
         g_debug ("Found %s in the cache", req->name);
     }
