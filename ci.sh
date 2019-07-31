@@ -20,22 +20,22 @@
 
 DOMAINS="
     ipv4.google.com
-    google.com
-    youtube.com
-    facebook.com
-    baidu.com
-    wikipedia.org
-    taobao.com
-    amazon.com
-    twitter.com
-    instagram.com
-    reddit.com
-    yandex.ru
-    netflix.com
-    aliexpress.com
-    ebay.com
-    bing.com
-    github.com
+    www.google.com
+    www.youtube.com
+    www.facebook.com
+    www.baidu.com
+    www.wikipedia.org
+    www.taobao.com
+    www.amazon.com
+    www.twitter.com
+    www.instagram.com
+    www.reddit.com
+    www.yandex.ru
+    www.netflix.com
+    www.aliexpress.com
+    www.ebay.com
+    www.bing.com
+    www.github.com
 "
 
 # at least some Travis and AWS CodeBuild machines don't have an IPv6 route, so
