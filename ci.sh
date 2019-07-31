@@ -39,8 +39,8 @@ DOMAINS="
     github.com
 "
 
-# at least some Travis machines don't have an IPv6 route, so we only resolve
-# these
+# at least some Travis and AWS CodeBuild machines don't have an IPv6 route, so
+# we only resolve these
 IPV6_ONLY_DOMAINS="
     ipv6.google.com
 "
