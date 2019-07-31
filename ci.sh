@@ -20,7 +20,6 @@
 
 DOMAINS="
     ipv4.google.com
-    ipv6.google.com
     google.com
     youtube.com
     facebook.com
