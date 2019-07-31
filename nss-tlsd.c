@@ -557,9 +557,9 @@ on_response (GObject         *source_object,
              GAsyncResult    *res,
              gpointer        user_data)
 {
-    GError *err = NULL;
+    g_autoptr(GError) err = NULL;
     struct nss_tls_session *session = (struct nss_tls_session *)user_data;
-    GInputStream *in = NULL;
+    g_autoptr(GInputStream) in = NULL;
 
     in = soup_session_send_finish (SOUP_SESSION (source_object),
                                    res,
@@ -592,19 +592,10 @@ on_response (GObject         *source_object,
                                    session);
 
     g_object_unref (session->message);
-    g_object_unref (in);
 
     return;
 
 cleanup:
-    if (err) {
-        g_error_free (err);
-    }
-
-    if (in) {
-        g_object_unref (in);
-    }
-
     g_object_unref (session->message);
 
     if (session->response.count == 0) {
