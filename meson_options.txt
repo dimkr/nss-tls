@@ -1,7 +1,7 @@
 option(
     'resolvers',
     type: 'string',
-    value: 'cloudflare-dns.com/dns-query',
+    value: 'dns9.quad9.net/dns-query',
     description: 'Comma-delimited URLs of DoH servers to use'
 )
 

@@ -75,17 +75,17 @@ This will enable a system nss-tlsd instance for all non-interactive processes (w
 
 ## Choosing a DoH Server
 
-By default, nss-tls performs all name lookup through [cloudflare-dns.com/dns-query](https://developers.cloudflare.com/1.1.1.1/dns-over-https/).
+By default, nss-tls performs all name lookup through [Quad9](https://www.quad9.net/doh-quad9-dns-servers/).
 
 To use a different DoH server, use the "resolvers" build option:
 
-    meson configure -Dresolvers=dns9.quad9.net/dns-query
+    meson configure -Dresolvers=cloudflare-dns.com/dns-query
 
 ## Using Multiple DoH Servers
 
 It is also possible to use multiple DoH servers:
 
-    meson configure -Dresolvers=cloudflare-dns.com/dns-query,dns9.quad9.net/dns-query
+    meson configure -Dresolvers=dns9.quad9.net/dns-query,cloudflare-dns.com/dns-query
 
 When nss-tls is configured like this, it pseudo-randomly chooses one of the servers, for each name lookup. The pseudo-random choice of the server is deterministic: if the same domain is resolved twice (e.g. for its IPv4 and IPv6 addresses, respectively), nss-tlsd will use the same DoH server for both queries. If nss-tlsd is restarted, it will keep using the same DoH server to resolve that domain. This contributes to privacy, since every DoH server sees only a portion of the user's browsing history.
 
@@ -93,7 +93,7 @@ When nss-tls is configured like this, it pseudo-randomly chooses one of the serv
 
 To use nss-tls for name resolving, without falling back to DNS if resolving fails, build nss-tls with DoH servers specified using their addresses, e.g.:
 
-    meson configure -Dresolvers=1.1.1.1/dns-query,9.9.9.9/dns-query
+    meson configure -Dresolvers=9.9.9.9/dns-query,1.1.1.1/dns-query
 
 This way, nss-tls will not depend on other means of name resolving to resolve a DoH server address.
 
@@ -124,6 +124,6 @@ Then, set "enable-cache" for "hosts" to "yes" in /etc/nscd.conf. Then:
 
 nss-tls is free and unencumbered software released under the terms of the GNU Lesser General Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option) any later version license.
 
-nss-tls is not affiliated with 1.1.1.1, [Cloudflare](https://www.cloudflare.com/) or [Quad9](https://www.quad9.net/).
+nss-tls is not affiliated with [Quad9](https://www.quad9.net/) or [Cloudflare](https://www.cloudflare.com/).
 
 The ASCII art logo at the top was made using [FIGlet](http://www.figlet.org/).
