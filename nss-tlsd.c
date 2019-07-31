@@ -469,7 +469,7 @@ on_body (GObject         *source_object,
          gpointer        user_data)
 {
     ns_msg msg;
-    GError *err = NULL;
+    g_autoptr(GError) err = NULL;
     struct nss_tls_session *session = (struct nss_tls_session *)user_data;
     GOutputStream *out;
     gsize len;
@@ -541,10 +541,6 @@ on_body (GObject         *source_object,
     }
 
 cleanup:
-    if (err) {
-        g_error_free (err);
-    }
-
     if (session->response.count == 0) {
         stop_session (session);
     }
@@ -558,9 +554,9 @@ on_response (GObject         *source_object,
              GAsyncResult    *res,
              gpointer        user_data)
 {
-    GError *err = NULL;
+    g_autoptr(GError) err = NULL;
     struct nss_tls_session *session = (struct nss_tls_session *)user_data;
-    GInputStream *in = NULL;
+    g_autoptr(GInputStream) in = NULL;
 
     in = soup_session_send_finish (SOUP_SESSION (source_object),
                                    res,
@@ -593,19 +589,10 @@ on_response (GObject         *source_object,
                                    session);
 
     g_object_unref (session->message);
-    g_object_unref (in);
 
     return;
 
 cleanup:
-    if (err) {
-        g_error_free (err);
-    }
-
-    if (in) {
-        g_object_unref (in);
-    }
-
     g_object_unref (session->message);
 
     if (session->response.count == 0) {
@@ -671,7 +658,7 @@ on_request (GObject         *source_object,
             GAsyncResult    *res,
             gpointer        user_data)
 {
-    GError *err = NULL;
+    g_autoptr(GError) err = NULL;
     struct nss_tls_session *session = user_data;
     gsize len;
 
@@ -681,7 +668,6 @@ on_request (GObject         *source_object,
                                          &err)) {
         if (err) {
             g_warning ("Failed to receive a request: %s", err->message);
-            g_error_free (err);
         }
         else {
             g_warning ("Failed to receive a request");
