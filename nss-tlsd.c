@@ -55,6 +55,7 @@ struct nss_tls_session {
     struct nss_tls_res response;
     gint64 type;
     GSocketConnection *connection;
+    gboolean canon;
 };
 
 static SoupSession *soup = NULL;
@@ -330,6 +331,14 @@ resolve_cname (struct nss_tls_session *session)
              session->request.name,
              session->response.cname);
     strcpy (session->request.name, session->response.cname);
+
+    /*
+     * ignore CNAME records for this name; we don't want to be stuck in an
+     * infinite loop if the canonical form of A is B, while B has a CNAME record
+     * that points back to A
+     */
+    session->canon = TRUE;
+
     resolve_domain (session);
 }
 
@@ -428,7 +437,8 @@ on_answer (struct nss_tls_session   *session,
             }
         }
     }
-    else if ((type == ns_t_cname) &&
+    else if (!session->canon &&
+             (type == ns_t_cname) &&
              !session->response.cname[0] &&
              (ns_rr_rdlen (rr) > 0)) {
         if (dn_expand (dns,
@@ -672,6 +682,9 @@ on_connection (GSocketService     *service,
     session->connection = g_object_ref (connection);
     session->response.count = 0;
     session->response.expiry = -1;
+
+    /* we assume the domain is not canonical */
+    session->canon = FALSE;
 
     in = g_io_stream_get_input_stream (G_IO_STREAM (connection));
     /* read the incoming request */
