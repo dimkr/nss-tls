@@ -91,13 +91,18 @@ When nss-tls is configured like this, it pseudo-randomly chooses one of the serv
 
 ## DoH Without Fallback to DNS
 
-To use nss-tls for name resolving, without falling back to DNS if resolving fails, build nss-tls with DoH servers specified using their addresses, e.g.:
+If the DoH servers used by nss-tls are specified using their domain names, nss-tls needs a way to resolve the address of each DoH server and it cannot resolve it through itself.
+
+To build nss-tls without dependency on other resolving methods (like DNS), specify the DoH servers using their addresses, e.g.:
 
     meson configure -Dresolvers=9.9.9.9/dns-query,1.1.1.1/dns-query
 
-This way, nss-tls will not depend on other means of name resolving to resolve a DoH server address.
+Alternatively, the DoH server addresses can be hardcoded using /etc/hosts, e.g:
 
-Then, remove all DNS resolvers from the "hosts" entry in /etc/nsswitch.conf and keep "tls".
+    echo "8.8.8.8 dns.google" >> /etc/hosts
+    meson configure -Dresolvers=dns.google/dns-query
+
+To disable DNS and use nss-tls exclusively, remove all DNS resolvers from the "hosts" entry in /etc/nsswitch.conf (but keep "tls").
 
 ## Performance
 
@@ -124,6 +129,6 @@ Then, set "enable-cache" for "hosts" to "yes" in /etc/nscd.conf. Then:
 
 nss-tls is free and unencumbered software released under the terms of the GNU Lesser General Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option) any later version license.
 
-nss-tls is not affiliated with [Quad9](https://www.quad9.net/) or [Cloudflare](https://www.cloudflare.com/).
+nss-tls is not affiliated with [Quad9](https://www.quad9.net/), [Cloudflare](https://www.cloudflare.com/) or [Google](https://www.google.com/).
 
 The ASCII art logo at the top was made using [FIGlet](http://www.figlet.org/).
