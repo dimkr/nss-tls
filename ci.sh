@@ -18,32 +18,76 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
+DOMAINS="
+    ipv4.google.com
+    ipv6.google.com
+    google.com
+    youtube.com
+    facebook.com
+    baidu.com
+    wikipedia.org
+    taobao.com
+    amazon.com
+    twitter.com
+    instagram.com
+    reddit.com
+    yandex.ru
+    netflix.com
+    aliexpress.com
+    ebay.com
+    bing.com
+    github.com
+"
+
+# at least some Travis machines don't have an IPv6 route, so we only resolve
+# these
+IPV6_ONLY_DOMAINS="
+    ipv6.google.com
+"
+
 CC=gcc-8 meson --prefix=/usr --buildtype=release -Dstrip=true build
 ninja -C build install
 
 meson configure build -Dcache=false
 ninja -C build
 
-CC=clang-8 meson --prefix=/usr -Dresolvers=1.1.1.1/dns-query,9.9.9.9/dns-query -Db_sanitize=address build-asan
+CC=clang-8 meson --prefix=/usr -Dresolvers=1.1.1.1/dns-query,dns.google/dns-query,9.9.9.9/dns-query -Dcache=false -Ddeterministic=false -Db_sanitize=address build-asan
 ninja -C build-asan nss-tlsd
 
 ldconfig
+echo "8.8.8.8 dns.google" >> /etc/hosts
 cp -f /etc/nsswitch.conf /tmp/
 sed 's/hosts:.*/hosts: files tls/' -i /etc/nsswitch.conf
-G_MESSAGES_DEBUG=all ./build-asan/nss-tlsd &
+G_MESSAGES_DEBUG=all ./build-asan/nss-tlsd | tee /tmp/nss-tlsd.log &
 pid=$!
 sleep 1
 
-for i in a b
+for i in a b c d
 do
-    tlslookup ipv4.google.com
-    tlslookup ipv6.google.com
-    tlslookup google.com
+    for d in $DOMAINS $IPV6_ONLY_DOMAINS
+    do
+        tlslookup $d
+    done
 
-    getent hosts ipv4.google.com
-    getent hosts ipv6.google.com
-    getent hosts google.com
+    for d in $DOMAINS $IPV6_ONLY_DOMAINS
+    do
+        getent hosts $d
+    done
+done
+
+# before 9169a0, the canonical name was an alias (instead of being the name,
+# with the non-canonical domain being the alias), so handshakes failed if the
+# certificate specified only the non-canonical name
+for d in $DOMAINS
+do
+    wget -T 5 -t 2 -O /dev/null https://$d
 done
 
 kill $pid
 sleep 1
+
+# before 963b0b, 8.8.8.8 responded with 400 if the dns= parameter contained URL
+# unsafe characters
+[ -n "`grep '^< HTTP/' /tmp/nss-tlsd.log | grep -v 200`" ] && exit 1
+
+exit 0

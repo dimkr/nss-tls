@@ -18,10 +18,10 @@
 
 project('nss-tls', 'c', version: '1.0', license : ['LGPL2.1+'])
 
-resolvers = get_option('resolvers')
+resolvers = get_option('resolvers').split(',')
 resolver_urls = []
 resolver_domains = []
-foreach resolver_url: resolvers.split(',')
+foreach resolver_url: resolvers
     resolver_domain = resolver_url.split('/')[0]
     resolver_domains += ['"@0@"'.format(resolver_domain)]
     resolver_urls += ['"@0@"'.format(resolver_url)]
@@ -55,6 +55,12 @@ add_project_arguments(
 
 if get_option('cache')
     add_project_arguments('-DNSS_TLS_CACHE', language: 'c')
+endif
+
+if get_option('deterministic')
+    add_project_arguments('-DNSS_TLS_DETERMINISTIC', language: 'c')
+elif resolvers.length() > 1
+    warning('Disabling deterministic server choice may harm privacy')
 endif
 
 if get_option('buildtype').startswith('debug')

@@ -19,6 +19,12 @@ option(
 )
 
 option(
+    'deterministic',
+    type: 'boolean',
+    description: 'Use a deterministic method to choose the DoH server to use'
+)
+
+option(
     'user',
     type: 'string',
     value: 'daemon',

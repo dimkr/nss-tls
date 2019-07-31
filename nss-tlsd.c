@@ -244,8 +244,6 @@ resolve_domain (struct nss_tls_session *session)
     SoupMessageFlags flags;
     guint id = 0;
 
-    g_debug ("Resolving %s", session->request.name);
-
 #ifdef NSS_TLS_CACHE
     if (get_cached_response (session)) {
         out = g_io_stream_get_output_stream (G_IO_STREAM (session->connection));
@@ -288,10 +286,24 @@ resolve_domain (struct nss_tls_session *session)
 
     dns = encode_dns_query (buf, (gsize)len);
 
+#ifdef NSS_TLS_DETERMINISTIC
     if (G_N_ELEMENTS (urls) > 1) {
         id = g_str_hash (session->request.name) % G_N_ELEMENTS (urls);
     }
+#else
+    id = g_random_int_range (0, G_N_ELEMENTS (urls));
+#endif
 
+    if (G_N_ELEMENTS (urls) > 1) {
+        g_debug ("Resolving %s (%s) using %s",
+                 session->request.name,
+                 (session->request.af == AF_INET) ? "IPv4" : "IPv6",
+                 urls[id]);
+    } else {
+        g_debug ("Resolving %s (%s)",
+                 session->request.name,
+                 (session->request.af == AF_INET) ? "IPv4" : "IPv6");
+    }
     url = g_strdup_printf ("https://%s?dns=%s", urls[id], dns);
 
     session->response.cname[0] = '\0';
@@ -519,9 +531,10 @@ on_body (GObject         *source_object,
                                          on_sent,
                                          session);
 
-        g_debug ("Done querying %s (%hhu results)",
+        g_debug ("Done resolving %s with %hhu %s result(s)",
                  session->request.name,
-                 session->response.count);
+                 session->response.count,
+                 (session->request.af == AF_INET) ? "IPv4" : "IPv6");
 
         return;
     }
