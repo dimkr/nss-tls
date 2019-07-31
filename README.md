@@ -8,6 +8,8 @@
 
 ![Build Status](https://codebuild.us-east-1.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiUzM4dGlsK2dPMmdoRkNQcjRjSU1JVmJENHNCTFFHVzVXSUQ0eWw2ajhYZVU3d0hhb2s0d0pzdzNNZUxSenc2Y1J3VmNyak9Udy91cUVsazlOR1h4WWJZPSIsIml2UGFyYW1ldGVyU3BlYyI6IjdFTWxobnVDRVVLbWNkUEYiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=master)
 
+__This is the deprecated 0.x branch of nss-tls, which uses RFC 8484 incompliant, JSON-based resolving. Unless you have a good reason to use this version, use a later version.__
+
 ## Motivation
 
 Unlike most web browser traffic, which is encrypted thanks to HTTPS, the resolving of domain names to internet addresses still happens through DNS, an old, unencrypted protocol. This benefits analytics companies, advertisers, internet providers and attackers, but not the end-user, who seeks online privacy and security.
