@@ -55,6 +55,7 @@ struct nss_tls_session {
     struct nss_tls_res response;
     gint64 type;
     GSocketConnection *connection;
+    SoupMessage *message;
 };
 
 static SoupSession *soup = NULL;
@@ -238,7 +239,6 @@ resolve_domain (struct nss_tls_session *session)
 #ifdef NSS_TLS_CACHE
     GOutputStream *out;
 #endif
-    SoupMessage *msg;
     int type, len;
     SoupMessageFlags flags;
     guint id = 0;
@@ -296,25 +296,23 @@ resolve_domain (struct nss_tls_session *session)
     session->response.cname[0] = '\0';
     session->type = (gint64)type;
 
-    msg = soup_message_new ("GET", url);
+    session->message = soup_message_new ("GET", url);
 
-    flags = soup_message_get_flags (msg);
-    soup_message_set_flags (msg, flags | SOUP_MESSAGE_IDEMPOTENT);
+    flags = soup_message_get_flags (session->message);
+    soup_message_set_flags (session->message, flags | SOUP_MESSAGE_IDEMPOTENT);
 
-    soup_message_headers_append (msg->request_headers,
+    soup_message_headers_append (session->message->request_headers,
                                  "Content-Type",
                                  "application/dns-message");
-    soup_message_headers_append (msg->request_headers,
+    soup_message_headers_append (session->message->request_headers,
                                  "Accept",
                                  "application/dns-message");
 
     soup_session_send_async (soup,
-                             msg,
+                             session->message,
                              NULL,
                              on_response,
                              session);
-
-    g_object_unref (msg);
 
     g_free (url);
     g_free (dns);
@@ -555,6 +553,13 @@ on_response (GObject         *source_object,
         goto cleanup;
     }
 
+    if (!SOUP_STATUS_IS_SUCCESSFUL (session->message->status_code)) {
+        g_warning ("Failed to query %s: HTTP %d",
+                   session->request.name,
+                   session->message->status_code);
+        goto cleanup;
+    }
+
     g_input_stream_read_all_async (in,
                                    session->dns,
                                    sizeof (session->dns),
@@ -563,6 +568,7 @@ on_response (GObject         *source_object,
                                    on_body,
                                    session);
 
+    g_object_unref (session->message);
     g_object_unref (in);
 
     return;
@@ -575,6 +581,8 @@ cleanup:
     if (in) {
         g_object_unref (in);
     }
+
+    g_object_unref (session->message);
 
     if (session->response.count == 0) {
         stop_session (session);
