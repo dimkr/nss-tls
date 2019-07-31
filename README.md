@@ -53,7 +53,7 @@ nss-tls uses [Meson](http://mesonbuild.com/) as its build system.
 
 On [Debian](http://www.debian.org/) and derivatives, these dependencies can be obtained using:
 
-    apt install libglib2.0-dev libsoup2.4-dev libjson-glib-dev ninja-build python3-pip
+    apt install libglib2.0-dev libsoup2.4-dev ninja-build python3-pip
     pip3 install meson
 
 ## Usage
