@@ -74,6 +74,14 @@ do
     done
 done
 
+# resolving the domain of a DoH server should always fail
+tlslookup dns.google && exit 1
+
+# resolving domains suffixed by the local domain should fail too and change of
+# the local domain should take effect immediately
+echo "search ci" >> /etc/resolv.conf
+tlslookup google.com.ci && exit 1
+
 # before 9169a0, the canonical name was an alias (instead of being the name,
 # with the non-canonical domain being the alias), so handshakes failed if the
 # certificate specified only the non-canonical name

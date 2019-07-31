@@ -61,6 +61,7 @@ struct nss_tls_session {
 
 static SoupSession *soup = NULL;
 static const gchar *urls[] = {NSS_TLS_RESOLVER_URLS};
+static const char *domains[] = {NSS_TLS_RESOLVER_DOMAINS};
 
 #ifdef NSS_TLS_CACHE
 
@@ -93,7 +94,7 @@ on_cache_cleanup (gpointer user_data)
 
     now = g_get_monotonic_time ();
 
-    for (i = 0; i < G_N_ELEMENTS(caches); ++i) {
+    for (i = 0; i < G_N_ELEMENTS (caches); ++i) {
         g_hash_table_foreach_remove (caches[i], check_ttl, &now);
     }
 
@@ -612,6 +613,11 @@ cleanup:
     }
 }
 
+/*
+ * we don't want to leak the local domain to the DoH server provider (for
+ * example, it may indicate a router model) and we don't want to waste time on
+ * this query if it's going to fail anyway
+ */
 static
 gboolean
 is_suffixed (const gchar *name)
@@ -626,11 +632,32 @@ is_suffixed (const gchar *name)
     }
 
     for (i = 0; (i < G_N_ELEMENTS (res.dnsrch)) && res.dnsrch[i]; ++i) {
-        suffix = g_strconcat(".", res.dnsrch[i], NULL);
+        suffix = g_strconcat (".", res.dnsrch[i], NULL);
         ret = g_str_has_suffix (name, suffix);
         g_free (suffix);
         if (ret) {
+            g_debug ("%s is suffixed by a local domain", name);
             return ret;
+        }
+    }
+
+    return FALSE;
+}
+
+/*
+ * the DoH server addresses must be resolved by other means, otherwise this
+ * results in infinite recursion
+ */
+static
+gboolean
+is_server_domain (const gchar *name)
+{
+    gint i;
+
+    for (i = 0; i < G_N_ELEMENTS (domains); ++i) {
+        if (strcmp (name, domains[i]) == 0) {
+            g_debug ("%s is a DoH server domain", name);
+            return TRUE;
         }
     }
 
@@ -669,8 +696,8 @@ on_request (GObject         *source_object,
 
     session->request.name[sizeof (session->request.name) - 1] = '\0';
 
-    if (is_suffixed (session->request.name)) {
-        g_debug ("%s is suffixed by a local domain", session->request.name);
+    if (is_suffixed (session->request.name) ||
+        is_server_domain (session->request.name)) {
         goto fail;
     }
 
@@ -792,7 +819,7 @@ int main (int argc, char **argv)
 
 #ifdef NSS_TLS_CACHE
     if (cache) {
-        for (i = 0; i < G_N_ELEMENTS(caches); ++i) {
+        for (i = 0; i < G_N_ELEMENTS (caches); ++i) {
             caches[i] = g_hash_table_new_full (g_str_hash,
                                                g_str_equal,
                                                g_free,
@@ -859,7 +886,7 @@ int main (int argc, char **argv)
     g_object_unref (sa);
 #ifdef NSS_TLS_CACHE
     if (cache) {
-        for (i = G_N_ELEMENTS(caches) - 1; i >= 0; --i) {
+        for (i = G_N_ELEMENTS (caches) - 1; i >= 0; --i) {
             g_hash_table_unref (caches[i]);
         }
     }
