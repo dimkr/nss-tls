@@ -326,6 +326,9 @@ static
 void
 resolve_cname (struct nss_tls_session *session)
 {
+    g_debug ("The canonical name of %s is %s",
+             session->request.name,
+             session->response.cname);
     strcpy (session->request.name, session->response.cname);
     resolve_domain (session);
 }
@@ -432,11 +435,7 @@ on_answer (struct nss_tls_session   *session,
                        dns + len,
                        ns_rr_rdata (rr),
                        session->response.cname,
-                       sizeof (session->response.cname)) > 0) {
-            g_debug ("The canonical name of %s is %s",
-                     session->request.name,
-                     session->response.cname);
-        } else {
+                       sizeof (session->response.cname)) <= 0) {
             session->response.cname[0] = '\0';
         }
     }
