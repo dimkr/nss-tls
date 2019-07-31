@@ -237,7 +237,7 @@ gboolean
 resolve_domain (struct nss_tls_session *session)
 {
     static unsigned char buf[512];
-    gchar *url, *dns;
+    g_autofree gchar *url = NULL, *dns = NULL;
 #ifdef NSS_TLS_CACHE
     GOutputStream *out;
 #endif
@@ -327,9 +327,6 @@ resolve_domain (struct nss_tls_session *session)
                              NULL,
                              on_response,
                              session);
-
-    g_free (url);
-    g_free (dns);
 
     return TRUE;
 }
@@ -612,7 +609,7 @@ is_suffixed (const gchar *name)
     struct __res_state res;
     gchar *suffix;
     gboolean ret;
-    unsigned int i;
+    guint i;
 
     if (res_ninit (&res) < 0) {
         return FALSE;
