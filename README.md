@@ -32,7 +32,7 @@ nss-tls consists of three parts:
 
 An unprivileged user can start a private, unprivileged instance of nss-tlsd and libnss-tls.so will automatically use that one, instead of the system-wide instance of nss-tlsd. Each user's nss-tls instance holds its own cache of lookup results, to speed up resolving. Because the cache is not shared with other users, it remains "hot" even if other users resolve many names.
 
-Users who don't have such a private instance will continue to use the system-wide instance, which does not perform caching, to prevent a user from extracting the browsing history of another user, using timing-based methods. In addition, it drops its privileges to greatly reduce its attack surface.
+Users who don't have such a private instance will continue to use the system-wide instance, which does not perform caching, to prevent a user from extracting the browsing history of another user, using timing-based methods. In addition, nss-tlsd drops its privileges to greatly reduce its attack surface.
 
 Also, nss-tls is capable of using multiple DoH servers, with a deterministic algorithm that chooses which server to use to resolve a domain. This way, no DoH server can track the user's entire browsing history.
 
