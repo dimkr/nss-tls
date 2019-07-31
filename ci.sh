@@ -24,7 +24,7 @@ ninja -C build install
 meson configure build -Dcache=false
 ninja -C build
 
-CC=clang-8 meson --prefix=/usr -Dresolvers=1.1.1.1/dns-query,9.9.9.9/dns-query -Db_sanitize=address build-asan
+CC=clang-8 meson --prefix=/usr -Dresolvers=1.1.1.1/dns-query -Db_sanitize=address build-asan
 ninja -C build-asan nss-tlsd
 
 ldconfig
