@@ -56,6 +56,7 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
     }
 
     *errnop = ENOENT;
+    *h_errnop = NETDB_SUCCESS;
 
     /* must be resolved by other means, otherwise this results in infinite
      * recursion */
