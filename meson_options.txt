@@ -1,5 +1,33 @@
-option('resolvers', type: 'string', value: 'cloudflare-dns.com/dns-query')
-option('timeout', type: 'integer', value: 4)
-option('cache', type: 'boolean')
-option('user', type: 'string', value: 'daemon')
-option('group', type: 'string', value: 'daemon')
+option(
+    'resolvers',
+    type: 'string',
+    value: 'cloudflare-dns.com/dns-query',
+    description: 'Comma-delimited URLs of DoH servers to use'
+)
+
+option(
+    'timeout',
+    type: 'integer',
+    value: 4,
+    description: 'Timeout for each resolving attempt'
+)
+
+option(
+    'cache',
+    type: 'boolean',
+    description: 'Keep internal cache in nss-tlsd'
+)
+
+option(
+    'user',
+    type: 'string',
+    value: 'daemon',
+    description: 'An unprivileged user to drop to when nss-tlsd runs as root'
+)
+
+option(
+    'group',
+    type: 'string',
+    value: 'daemon',
+    description: 'An unprivileged group to drop to when nss-tlsd runs as root'
+)
