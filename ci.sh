@@ -20,22 +20,22 @@
 
 DOMAINS="
     ipv4.google.com
-    www.google.com
-    www.youtube.com
-    www.facebook.com
-    www.baidu.com
-    www.wikipedia.org
-    www.taobao.com
-    www.amazon.com
-    www.twitter.com
-    www.instagram.com
-    www.reddit.com
-    www.yandex.ru
-    www.netflix.com
-    www.aliexpress.com
-    www.ebay.com
-    www.bing.com
-    www.github.com
+    google.com
+    youtube.com
+    facebook.com
+    baidu.com
+    wikipedia.org
+    taobao.com
+    amazon.com
+    twitter.com
+    instagram.com
+    reddit.com
+    yandex.ru
+    netflix.com
+    aliexpress.com
+    ebay.com
+    bing.com
+    github.com
 "
 
 # at least some Travis and AWS CodeBuild machines don't have an IPv6 route, so
@@ -61,14 +61,17 @@ G_MESSAGES_DEBUG=all ./build-asan/nss-tlsd | tee /tmp/nss-tlsd.log &
 pid=$!
 sleep 1
 
-for i in a b c d
+# pick 3 random domains
+domains=`echo $DOMAINS | tr ' ' \\\n | shuf | head -n 3`
+
+for i in a b c
 do
-    for d in $DOMAINS $IPV6_ONLY_DOMAINS
+    for d in $domains $IPV6_ONLY_DOMAINS
     do
         tlslookup $d
     done
 
-    for d in $DOMAINS $IPV6_ONLY_DOMAINS
+    for d in $domains $IPV6_ONLY_DOMAINS
     do
         getent hosts $d
     done
@@ -85,7 +88,7 @@ tlslookup google.com.ci && exit 1
 # before 9169a0, the canonical name was an alias (instead of being the name,
 # with the non-canonical domain being the alias), so handshakes failed if the
 # certificate specified only the non-canonical name
-for d in $DOMAINS
+for d in $domains
 do
     wget -T 5 -t 2 -O /dev/null https://$d
 done
