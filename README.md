@@ -94,7 +94,7 @@ Previously, nss-tls was limited to a single server, specified using the now depr
 
 To use nss-tls for name resolving, without falling back to DNS if resolving fails, build nss-tls with DoH servers specified using their addresses, e.g.:
 
-    meson configure -Dresolvers=1.1.1.1/dns-query,9.9.9.9/dns-query
+    meson configure -Dresolvers=1.1.1.1/dns-query,9.9.9.9:5053/dns-query
 
 This way, nss-tls will not depend on other means of name resolving to resolve a DoH server address.
 
