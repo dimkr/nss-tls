@@ -51,6 +51,7 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
 
     if (buflen < sizeof(*data)) {
         *errnop = ERANGE;
+        *h_errnop = NETDB_INTERNAL;
         return NSS_STATUS_TRYAGAIN;
     }
 
