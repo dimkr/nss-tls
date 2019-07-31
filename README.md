@@ -101,9 +101,11 @@ Then, remove all DNS resolvers from the "hosts" entry in /etc/nsswitch.conf and 
 
 ## Performance
 
-DNS over HTTPS is much slower than DNS. Therefore, each nss-tls instance keeps established HTTPS connections open and reuses them.
+On paper, DNS over HTTPS is much slower than DNS, due to the overhead of TCP and TLS.
 
-Also, by default, each user's nss-tls instance maintains an internal cache of lookup results.
+Therefore, each nss-tls instance keeps established HTTPS connections open and reuses them. Also, by default, each user's nss-tls instance maintains an internal cache of lookup results. In this cache, IPv4 and IPv6 addresses are stored in separate hash tables, to make the cache faster to iterate over.
+
+Therefore, in reality, DNS over HTTPS using nss-tls may be much faster than DNS.
 
 To disable the internal cache, use the "cache" build option:
 
