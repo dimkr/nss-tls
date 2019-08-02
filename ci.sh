@@ -93,6 +93,8 @@ do
     wget -T 5 -t 2 -O /dev/null https://$d
 done
 
+./ci.py $domains
+
 kill $pid
 sleep 1
 
