@@ -6,7 +6,7 @@
 |_| |_|___/___/      \__|_|___/
 ```
 
-![Build Status](https://travis-ci.org/dimkr/nss-tls.svg?branch=master)
+[![Build Status](https://travis-ci.org/dimkr/nss-tls.svg?branch=master)](https://travis-ci.org/dimkr/nss-tls)
 
 ## Motivation
 
