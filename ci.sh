@@ -93,9 +93,7 @@ do
     wget -T 5 -t 2 -O /dev/null https://$d
 done
 
-./ci.py /usr/bin/firefox $domains
-
-# test against Firefox Nightly too
+# test against Firefox Nightly
 [ -f firefox/firefox ] || wget -O- "https://download.mozilla.org/?product=firefox-nightly-latest-ssl&os=linux64&lang=en-US" | tar -xjf-
 ./ci.py firefox/firefox $domains
 
