@@ -19,3 +19,5 @@
 FROM dimkr/c-dev
 
 RUN apt-get -qq update && apt-get -y --no-install-recommends install pkg-config libglib2.0-dev libsoup2.4-dev systemd firefox && apt-get autoremove --purge && apt-get autoclean
+RUN pip3 install selenium pytest pytest-xdist
+RUN wget -O- https://github.com/mozilla/geckodriver/releases/download/v0.24.0/geckodriver-v0.24.0-linux64.tar.gz | tar -xzf- -C /usr/local/bin
