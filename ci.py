@@ -27,29 +27,25 @@ import sys
 
 opts = Options()
 if os.getenv("CI"):
-    opts.add_argument("-headless")
+    opts.headless = True
 
 # use the native resolver (https://wiki.mozilla.org/Trusted_Recursive_Resolver)
 prof = webdriver.FirefoxProfile()
 prof.set_preference("network.trr.mode", 5)
 
+driver = webdriver.Firefox(firefox_binary=FirefoxBinary(sys.argv[1]),
+                           options=opts,
+                           firefox_profile=prof)
+
 class FirefoxTest(unittest.TestCase):
-    path = "/usr/bin/firefox"
-
-    def setUp(self):
-        self.driver = webdriver.Firefox(firefox_binary=FirefoxBinary(self.path),
-                                        options=opts,
-                                        firefox_profile=prof)
-
-    def tearDown(self):
-        self.driver.quit()
-
     def test_sanity(self):
-        for d in sys.argv[1:]:
+        for d in sys.argv[2:]:
             url = "https://" + d
-            self.driver.get(url)
-            assert d in self.driver.current_url
+            driver.get(url)
+            assert d in driver.current_url
 
 if __name__ == "__main__":
     suite = unittest.TestLoader().loadTestsFromTestCase(FirefoxTest)
-    unittest.TextTestRunner(verbosity=2).run(suite)
+    result = unittest.TextTestRunner(verbosity=2).run(suite)
+    driver.quit()
+    sys.exit(not result.wasSuccessful())
