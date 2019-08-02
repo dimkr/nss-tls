@@ -6,7 +6,7 @@
 |_| |_|___/___/      \__|_|___/
 ```
 
-![Build Status](https://codebuild.us-east-1.amazonaws.com/badges?uuid=eyJlbmNyeXB0ZWREYXRhIjoiUzM4dGlsK2dPMmdoRkNQcjRjSU1JVmJENHNCTFFHVzVXSUQ0eWw2ajhYZVU3d0hhb2s0d0pzdzNNZUxSenc2Y1J3VmNyak9Udy91cUVsazlOR1h4WWJZPSIsIml2UGFyYW1ldGVyU3BlYyI6IjdFTWxobnVDRVVLbWNkUEYiLCJtYXRlcmlhbFNldFNlcmlhbCI6MX0%3D&branch=master)
+![Build Status](https://travis-ci.org/dimkr/nss-tls.svg?branch=master)
 
 __This is the deprecated 0.x branch of nss-tls, which uses RFC 8484 incompliant, JSON-based resolving. Unless you have a good reason to use this version, use a later version.__
 
