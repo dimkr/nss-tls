@@ -27,7 +27,7 @@ This way, all applications that use the standard resolver API (getaddrinfo(), ge
 nss-tls consists of three parts:
 
 * nss-tlsd runs in the background and receives name resolving requests over a Unix socket.
-* libnss_tls.so is a tiny client library which delegates the resolving work to nss-tlsd through the Unix socket and passes the results back to the application. This way, applications that take advantage of nss-tls are not affected by the complexity and the resource consumption of the libraries it depends on, or the constraints they impose on applications that use them.
+* libnss_tls.so is a tiny client library, which delegates the resolving work to nss-tlsd through the Unix socket and passes the results back to the application, without dependencies other than libc. This way, applications that resolve through nss-tls are not affected by the complexity and resource consumption of runtime libraries (e.g. libstdc++) and dependency libraries, or the constraints they impose on applications that load them (like signal or thread safety issues).
 * tlslookup is equivalent to nslookup(1), but uses libnss_tls.so instead of DNS.
 
 ## Security and Privacy
