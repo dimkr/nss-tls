@@ -76,7 +76,11 @@ nss_tlsd = executable('nss-tlsd',
                       install: true,
                       install_dir: get_option('sbindir'))
 
-libnss_tls = shared_library('nss_tls', 'nss-tls.c', version: '2', install: true)
+libnss_tls = shared_library('nss_tls',
+                            'nss-tls.c',
+                            version: '2',
+                            dependencies: [dependency('threads')],
+                            install: true)
 
 tlslookup = executable('tlslookup',
                        'tlslookup.c',
