@@ -28,8 +28,15 @@
 #include <errno.h>
 #include <netdb.h>
 #include <nss.h>
+#include <pthread.h>
+#include <stdint.h>
 
 #include "nss-tls.h"
+
+static void cleanup(void *arg)
+{
+    close((int)(intptr_t)arg);
+}
 
 enum nss_status _nss_tls_gethostbyname2_r(const char *name,
                                           int af,
@@ -45,7 +52,8 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
     const char *dir;
     ssize_t out, total;
     size_t len;
-    int s, i;
+    int s, i, state;
+    enum nss_status status = NSS_STATUS_TRYAGAIN;
     uint8_t count;
 
     if (buflen < sizeof(*data)) {
@@ -77,22 +85,24 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
             strcpy(sun.sun_path, NSS_TLS_SOCKET_PATH);
     }
 
+    pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &state);
+
     s = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (s < 0) {
+        if (state != PTHREAD_CANCEL_DISABLE)
+            pthread_setcancelstate(state, NULL);
         *errnop = EAGAIN;
         return NSS_STATUS_TRYAGAIN;
     }
 
-    if ((setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) < 0) ||
-        (setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)) {
-        close(s);
-        return NSS_STATUS_TRYAGAIN;
-    }
+    pthread_cleanup_push(cleanup, (void *)(intptr_t)s);
 
-    if (connect(s, (const struct sockaddr *)&sun, sizeof(sun)) < 0) {
-        close(s);
-        return NSS_STATUS_TRYAGAIN;
-    }
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+
+    if ((setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) < 0) ||
+        (setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) ||
+        (connect(s, (const struct sockaddr *)&sun, sizeof(sun)) < 0))
+        goto pop;
 
     data->req.af = af;
     strncpy(data->req.name, name, sizeof(data->req.name));
@@ -102,10 +112,8 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
                    (unsigned char *)&data->req + total,
                    sizeof(data->req) - total,
                    MSG_NOSIGNAL);
-        if (out <= 0) {
-            close(s);
-            return NSS_STATUS_TRYAGAIN;
-        }
+        if (out <= 0)
+            goto pop;
     }
 
     for (total = 0; total < sizeof(data->res); total += out) {
@@ -113,20 +121,19 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
                    (unsigned char *)&data->res + total,
                    sizeof(data->res) - total,
                    0);
-        if (out < 0) {
-            close(s);
-            return NSS_STATUS_TRYAGAIN;
-        }
-        else if (out == 0)
+        if (out < 0)
+            goto pop;
+        if (out == 0)
             break;
     }
 
-    close(s);
+    if (total == 0) {
+        status = NSS_STATUS_NOTFOUND;
+        goto pop;
+    }
 
-    if (total == 0)
-        return NSS_STATUS_NOTFOUND;
-    else if (total != sizeof(data->res))
-        return NSS_STATUS_TRYAGAIN;
+    if (total != sizeof(data->res))
+        goto pop;
 
     count = data->res.count;
     if (count == 0)
@@ -144,7 +151,8 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
         break;
 
     default:
-        return NSS_STATUS_NOTFOUND;
+        status = NSS_STATUS_NOTFOUND;
+        goto pop;
     }
 
     for (i = 0; i < count; ++i)
@@ -164,5 +172,9 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
     ret->h_addr_list = data->addrs;
 
     *errnop = 0;
-    return NSS_STATUS_SUCCESS;
+    status = NSS_STATUS_SUCCESS;
+
+pop:
+    pthread_cleanup_pop(1);
+    return status;
 }
