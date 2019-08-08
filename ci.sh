@@ -68,7 +68,7 @@ for i in a b c
 do
     for d in $domains $IPV6_ONLY_DOMAINS
     do
-        valgrind --leak-check=full --track-fds=yes tlslookup $d
+        valgrind --leak-check=full --track-fds=yes --error-exitcode=1 tlslookup $d
     done
 
     for d in $domains $IPV6_ONLY_DOMAINS
