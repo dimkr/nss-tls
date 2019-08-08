@@ -34,9 +34,9 @@ G_MESSAGES_DEBUG=all ./build-asan/nss-tlsd &
 pid=$!
 sleep 1
 
-tlslookup ipv4.google.com
-tlslookup ipv6.google.com
-tlslookup google.com
+valgrind --leak-check=full --track-fds=yes tlslookup ipv4.google.com
+valgrind --leak-check=full --track-fds=yes tlslookup ipv6.google.com
+valgrind --leak-check=full --track-fds=yes tlslookup google.com
 
 getent hosts ipv4.google.com
 getent hosts ipv6.google.com
