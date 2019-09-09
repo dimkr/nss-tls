@@ -403,8 +403,10 @@ on_answer (struct nss_tls_session   *session,
            const int                a_type,
            const size_t             addrlen)
 {
+    static const uint32_t pfix[] = {0, 0, 0xFFFF};
     ns_rr rr;
     gint64 ttl, now, expiry;
+    const unsigned char *rdata;
     int type;
 
     if (ns_parserr (msg, ns_s_an, rr_id, &rr) < 0) {
@@ -419,8 +421,16 @@ on_answer (struct nss_tls_session   *session,
     type = ns_rr_type (rr);
     if (type == a_type) {
         if (ns_rr_rdlen (rr) == addrlen) {
+            rdata = ns_rr_rdata (rr);
+
+            if ((addrlen == sizeof(struct in6_addr) &&
+                memcmp (rdata, pfix, sizeof(pfix)))) {
+               g_debug ("Ignoring an IPv4-mapped address");
+               return;
+            }
+
             memcpy (&session->response.addrs[session->response.count],
-                    ns_rr_rdata (rr),
+                    rdata,
                     addrlen);
             ++session->response.count;
 
