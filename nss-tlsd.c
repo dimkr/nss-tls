@@ -48,6 +48,7 @@
 #define CACHE_SIZE 1024
 #define MAX_CONNS_PER_RESOLVER 10
 #define MAX_CONNS MAX_CONNS_PER_RESOLVER * G_N_ELEMENTS (urls)
+#define MAX_REQ_SIZE 512
 
 struct nss_tls_session {
     unsigned char dns[UINT16_MAX];
@@ -204,40 +205,10 @@ on_sent (GObject         *source_object,
          gpointer        user_data);
 
 static
-gchar *
-encode_dns_query (const unsigned char *buf, const gsize len)
-{
-    gchar *b64;
-    size_t i;
-
-    b64 = g_base64_encode (buf, len);
-
-    /* https://tools.ietf.org/html/rfc4648#section-5 */
-    for (i = 0; i < strlen (b64); ++i) {
-        switch (b64[i]) {
-        case '+':
-            b64[i] = '-';
-            break;
-
-        case '/':
-            b64[i] = '_';
-            break;
-
-        case '=':
-            b64[i] = '\0';
-            return b64;
-        }
-    }
-
-    return b64;
-}
-
-static
 gboolean
 resolve_domain (struct nss_tls_session *session)
 {
-    static unsigned char buf[512];
-    g_autofree gchar *url = NULL, *dns = NULL;
+    unsigned char *buf;
 #ifdef NSS_TLS_CACHE
     GOutputStream *out;
 #endif
@@ -272,6 +243,8 @@ resolve_domain (struct nss_tls_session *session)
         return FALSE;
     }
 
+    buf = g_malloc (MAX_REQ_SIZE);
+
     len = res_mkquery (QUERY,
                        session->request.name,
                        ns_c_in,
@@ -280,12 +253,11 @@ resolve_domain (struct nss_tls_session *session)
                        0,
                        NULL,
                        buf,
-                       sizeof (buf));
+                       MAX_REQ_SIZE);
     if (len <= 0) {
+        g_free (buf);
         return FALSE;
     }
-
-    dns = encode_dns_query (buf, (gsize)len);
 
 #ifdef NSS_TLS_DETERMINISTIC
     if (G_N_ELEMENTS (urls) > 1) {
@@ -305,19 +277,20 @@ resolve_domain (struct nss_tls_session *session)
                  session->request.name,
                  (session->request.af == AF_INET) ? "IPv4" : "IPv6");
     }
-    url = g_strdup_printf ("https://%s?dns=%s", urls[id], dns);
 
     session->response.cname[0] = '\0';
     session->type = (gint64)type;
 
-    session->message = soup_message_new ("GET", url);
+    session->message = soup_message_new ("POST", urls[id]);
 
     flags = soup_message_get_flags (session->message);
     soup_message_set_flags (session->message, flags | SOUP_MESSAGE_IDEMPOTENT);
 
-    soup_message_headers_append (session->message->request_headers,
-                                 "Content-Type",
-                                 "application/dns-message");
+    soup_message_set_request (session->message,
+                              "application/dns-message",
+                              SOUP_MEMORY_TAKE,
+                              (const char *)buf,
+                              (gsize)len);
     soup_message_headers_append (session->message->request_headers,
                                  "Accept",
                                  "application/dns-message");
