@@ -404,6 +404,7 @@ on_response (GObject         *source_object,
     JsonObject *rooto;
     JsonArray *answers;
     GOutputStream *out;
+    const char *type;
 
     in = soup_session_send_finish (SOUP_SESSION (source_object),
                                    res,
@@ -417,6 +418,17 @@ on_response (GObject         *source_object,
         else {
             g_warning ("Failed to session %s", session->request.name);
         }
+        goto cleanup;
+    }
+
+    type = soup_message_headers_get_content_type (
+        session->message->response_headers,
+        NULL
+    );
+    if (strcmp (type, "application/dns-json")) {
+        g_warning ("Bad response type for %s: %s",
+                   session->request.name,
+                   type);
         goto cleanup;
     }
 
