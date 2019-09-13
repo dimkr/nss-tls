@@ -455,7 +455,8 @@ on_body (GObject         *source_object,
     if (!g_input_stream_read_all_finish (G_INPUT_STREAM (source_object),
                                          res,
                                          &len,
-                                         &err)) {
+                                         &err) ||
+        !len) {
         goto cleanup;
     }
 
@@ -561,7 +562,7 @@ on_response (GObject         *source_object,
         session->message->response_headers,
         NULL
     );
-    if (strcmp (type, "application/dns-message")) {
+    if (type && strcmp (type, "application/dns-message")) {
         g_warning ("Bad response type for %s: %s",
                    session->request.name,
                    type);
