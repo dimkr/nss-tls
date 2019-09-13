@@ -48,6 +48,7 @@
 #define CACHE_SIZE 1024
 #define MAX_CONNS_PER_RESOLVER 10
 #define MAX_CONNS MAX_CONNS_PER_RESOLVER * G_N_ELEMENTS (urls)
+#define MAX_REQ_SIZE 512
 
 struct nss_tls_session {
     unsigned char dns[UINT16_MAX];
@@ -204,40 +205,10 @@ on_sent (GObject         *source_object,
          gpointer        user_data);
 
 static
-gchar *
-encode_dns_query (const unsigned char *buf, const gsize len)
-{
-    gchar *b64;
-    size_t i;
-
-    b64 = g_base64_encode (buf, len);
-
-    /* https://tools.ietf.org/html/rfc4648#section-5 */
-    for (i = 0; i < strlen (b64); ++i) {
-        switch (b64[i]) {
-        case '+':
-            b64[i] = '-';
-            break;
-
-        case '/':
-            b64[i] = '_';
-            break;
-
-        case '=':
-            b64[i] = '\0';
-            return b64;
-        }
-    }
-
-    return b64;
-}
-
-static
 gboolean
 resolve_domain (struct nss_tls_session *session)
 {
-    static unsigned char buf[512];
-    g_autofree gchar *url = NULL, *dns = NULL;
+    unsigned char *buf;
 #ifdef NSS_TLS_CACHE
     GOutputStream *out;
 #endif
@@ -272,6 +243,8 @@ resolve_domain (struct nss_tls_session *session)
         return FALSE;
     }
 
+    buf = g_malloc (MAX_REQ_SIZE);
+
     len = res_mkquery (QUERY,
                        session->request.name,
                        ns_c_in,
@@ -280,12 +253,17 @@ resolve_domain (struct nss_tls_session *session)
                        0,
                        NULL,
                        buf,
-                       sizeof (buf));
-    if (len <= 0) {
+                       MAX_REQ_SIZE);
+    if (len <= 1) {
+        g_free (buf);
         return FALSE;
     }
 
-    dns = encode_dns_query (buf, (gsize)len);
+    /*
+     * always use 0 for the transaction ID, to improve the server's cache hit
+     * rate
+     */
+    buf[0] = buf[1] = 0;
 
 #ifdef NSS_TLS_DETERMINISTIC
     if (G_N_ELEMENTS (urls) > 1) {
@@ -305,19 +283,20 @@ resolve_domain (struct nss_tls_session *session)
                  session->request.name,
                  (session->request.af == AF_INET) ? "IPv4" : "IPv6");
     }
-    url = g_strdup_printf ("https://%s?dns=%s", urls[id], dns);
 
     session->response.cname[0] = '\0';
     session->type = (gint64)type;
 
-    session->message = soup_message_new ("GET", url);
+    session->message = soup_message_new ("POST", urls[id]);
 
     flags = soup_message_get_flags (session->message);
     soup_message_set_flags (session->message, flags | SOUP_MESSAGE_IDEMPOTENT);
 
-    soup_message_headers_append (session->message->request_headers,
-                                 "Content-Type",
-                                 "application/dns-message");
+    soup_message_set_request (session->message,
+                              "application/dns-message",
+                              SOUP_MEMORY_TAKE,
+                              (const char *)buf,
+                              (gsize)len);
     soup_message_headers_append (session->message->request_headers,
                                  "Accept",
                                  "application/dns-message");
@@ -486,7 +465,8 @@ on_body (GObject         *source_object,
     if (!g_input_stream_read_all_finish (G_INPUT_STREAM (source_object),
                                          res,
                                          &len,
-                                         &err)) {
+                                         &err) ||
+        !len) {
         goto cleanup;
     }
 
@@ -564,6 +544,7 @@ on_response (GObject         *source_object,
     g_autoptr(GError) err = NULL;
     struct nss_tls_session *session = (struct nss_tls_session *)user_data;
     g_autoptr(GInputStream) in = NULL;
+    const char *type;
 
     in = soup_session_send_finish (SOUP_SESSION (source_object),
                                    res,
@@ -584,6 +565,17 @@ on_response (GObject         *source_object,
         g_warning ("Failed to query %s: HTTP %d",
                    session->request.name,
                    session->message->status_code);
+        goto cleanup;
+    }
+
+    type = soup_message_headers_get_content_type (
+        session->message->response_headers,
+        NULL
+    );
+    if (type && strcmp (type, "application/dns-message")) {
+        g_warning ("Bad response type for %s: %s",
+                   session->request.name,
+                   type);
         goto cleanup;
     }
 
