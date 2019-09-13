@@ -281,9 +281,15 @@ resolve_domain (struct nss_tls_session *session)
                        NULL,
                        buf,
                        sizeof (buf));
-    if (len <= 0) {
+    if (len <= 1) {
         return FALSE;
     }
+
+    /*
+     * always use 0 for the transaction ID, to improve the server's cache hit
+     * rate
+     */
+    buf[0] = buf[1] = 0;
 
     dns = encode_dns_query (buf, (gsize)len);
 
