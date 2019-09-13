@@ -24,7 +24,7 @@ resolver_domains = []
 foreach resolver_url: resolvers
     resolver_domain = resolver_url.split('/')[0]
     resolver_domains += ['"@0@"'.format(resolver_domain)]
-    resolver_urls += ['"@0@"'.format(resolver_url)]
+    resolver_urls += ['"https://@0@"'.format(resolver_url)]
 endforeach
 resolver_urls = ','.join(resolver_urls)
 resolver_domains = ','.join(resolver_domains)
