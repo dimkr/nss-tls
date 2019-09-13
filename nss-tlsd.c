@@ -425,7 +425,7 @@ on_response (GObject         *source_object,
         session->message->response_headers,
         NULL
     );
-    if (strcmp (type, "application/dns-json")) {
+    if (type && strcmp (type, "application/dns-json")) {
         g_warning ("Bad response type for %s: %s",
                    session->request.name,
                    type);
