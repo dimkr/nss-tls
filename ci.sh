@@ -44,13 +44,13 @@ IPV6_ONLY_DOMAINS="
     ipv6.google.com
 "
 
-CC=gcc-8 meson --prefix=/usr --buildtype=release -Dstrip=true build
+meson --prefix=/usr --buildtype=release -Dstrip=true build
 ninja -C build install
 
 meson configure build -Dcache=false
 ninja -C build
 
-CC=clang-8 meson --prefix=/usr -Dresolvers=9.9.9.9/dns-query,dns.google/dns-query,1.1.1.1/dns-query -Dcache=false -Ddeterministic=false -Db_sanitize=address build-asan
+CC=clang meson --prefix=/usr -Dresolvers=9.9.9.9/dns-query,dns.google/dns-query,1.1.1.1/dns-query -Dcache=false -Ddeterministic=false -Db_sanitize=address build-asan
 ninja -C build-asan nss-tlsd
 
 ldconfig
