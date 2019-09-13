@@ -533,6 +533,7 @@ on_response (GObject         *source_object,
     g_autoptr(GError) err = NULL;
     struct nss_tls_session *session = (struct nss_tls_session *)user_data;
     g_autoptr(GInputStream) in = NULL;
+    const char *type;
 
     in = soup_session_send_finish (SOUP_SESSION (source_object),
                                    res,
@@ -553,6 +554,17 @@ on_response (GObject         *source_object,
         g_warning ("Failed to query %s: HTTP %d",
                    session->request.name,
                    session->message->status_code);
+        goto cleanup;
+    }
+
+    type = soup_message_headers_get_content_type (
+        session->message->response_headers,
+        NULL
+    );
+    if (strcmp (type, "application/dns-message")) {
+        g_warning ("Bad response type for %s: %s",
+                   session->request.name,
+                   type);
         goto cleanup;
     }
 
