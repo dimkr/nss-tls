@@ -25,10 +25,12 @@ resolver_methods = []
 foreach resolver: resolvers
     resolver_tokens = resolver.split('+')
     resolver_url = resolver_tokens[0]
-    if resolver_tokens.length() > 1
+    if resolver_tokens.length() == 2
         resolver_method = resolver_tokens[1]
-    else
+    elif resolver_tokens.length() == 1
         resolver_method = 'post'
+    else
+        error('Bad resolver: @0@'.format(resolver))
     endif
 
     resolver_domain = resolver_url.split('/')[0]
