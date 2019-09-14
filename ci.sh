@@ -18,13 +18,13 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-CC=gcc-8 meson --prefix=/usr --buildtype=release -Dstrip=true build
+meson --prefix=/usr --buildtype=release -Dstrip=true build
 ninja -C build install
 
 meson configure build -Dcache=false
 ninja -C build
 
-CC=clang-8 meson --prefix=/usr -Dresolvers=1.1.1.1/dns-query,9.9.9.9:5053/dns-query,dns.google/resolve -Db_sanitize=address build-asan
+CC=clang meson --prefix=/usr -Dresolvers=1.1.1.1/dns-query,9.9.9.9:5053/dns-query,dns.google/resolve -Db_sanitize=address build-asan
 ninja -C build-asan nss-tlsd
 
 ldconfig
