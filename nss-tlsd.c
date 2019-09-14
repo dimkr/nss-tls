@@ -50,6 +50,11 @@
 #define MAX_CONNS MAX_CONNS_PER_RESOLVER * G_N_ELEMENTS (urls)
 #define MAX_REQ_SIZE 512
 
+enum nss_tls_methods {
+    NSS_TLS_METHOD_POST,
+    NSS_TLS_METHOD_GET
+};
+
 struct nss_tls_session {
     unsigned char dns[UINT16_MAX];
     struct nss_tls_req request;
@@ -63,6 +68,7 @@ struct nss_tls_session {
 static SoupSession *soup = NULL;
 static const gchar *urls[] = {NSS_TLS_RESOLVER_URLS};
 static const char *domains[] = {NSS_TLS_RESOLVER_DOMAINS};
+static const enum nss_tls_methods methods[] = {NSS_TLS_RESOLVER_METHODS};
 
 #ifdef NSS_TLS_CACHE
 
@@ -205,10 +211,41 @@ on_sent (GObject         *source_object,
          gpointer        user_data);
 
 static
+gchar *
+encode_dns_query (const unsigned char *buf, const gsize len)
+{
+    gchar *b64;
+    size_t i;
+
+    b64 = g_base64_encode (buf, len);
+
+    /* https://tools.ietf.org/html/rfc4648#section-5 */
+    for (i = 0; i < strlen (b64); ++i) {
+        switch (b64[i]) {
+        case '+':
+            b64[i] = '-';
+            break;
+
+        case '/':
+            b64[i] = '_';
+            break;
+
+        case '=':
+            b64[i] = '\0';
+            return b64;
+        }
+    }
+
+    return b64;
+}
+
+static
 gboolean
 resolve_domain (struct nss_tls_session *session)
 {
-    unsigned char *buf;
+    static unsigned char sbuf[MAX_REQ_SIZE];
+    unsigned char *buf = sbuf;
+    g_autofree gchar *url = NULL, *dns = NULL;
 #ifdef NSS_TLS_CACHE
     GOutputStream *out;
 #endif
@@ -243,7 +280,17 @@ resolve_domain (struct nss_tls_session *session)
         return FALSE;
     }
 
-    buf = g_malloc (MAX_REQ_SIZE);
+#ifdef NSS_TLS_DETERMINISTIC
+    if (G_N_ELEMENTS (urls) > 1) {
+        id = g_str_hash (session->request.name) % G_N_ELEMENTS (urls);
+    }
+#else
+    id = g_random_int_range (0, G_N_ELEMENTS (urls));
+#endif
+
+    if (methods[id] == NSS_TLS_METHOD_POST) {
+        buf = g_malloc (MAX_REQ_SIZE);
+    }
 
     len = res_mkquery (QUERY,
                        session->request.name,
@@ -255,7 +302,9 @@ resolve_domain (struct nss_tls_session *session)
                        buf,
                        MAX_REQ_SIZE);
     if (len <= 1) {
-        g_free (buf);
+        if (methods[id] == NSS_TLS_METHOD_POST) {
+            g_free (buf);
+        }
         return FALSE;
     }
 
@@ -264,14 +313,6 @@ resolve_domain (struct nss_tls_session *session)
      * rate
      */
     buf[0] = buf[1] = 0;
-
-#ifdef NSS_TLS_DETERMINISTIC
-    if (G_N_ELEMENTS (urls) > 1) {
-        id = g_str_hash (session->request.name) % G_N_ELEMENTS (urls);
-    }
-#else
-    id = g_random_int_range (0, G_N_ELEMENTS (urls));
-#endif
 
     if (G_N_ELEMENTS (urls) > 1) {
         g_debug ("Resolving %s (%s) using %s",
@@ -287,16 +328,26 @@ resolve_domain (struct nss_tls_session *session)
     session->response.cname[0] = '\0';
     session->type = (gint64)type;
 
-    session->message = soup_message_new ("POST", urls[id]);
+    if (methods[id] == NSS_TLS_METHOD_POST) {
+        session->message = soup_message_new ("POST", urls[id]);
+    } else {
+        dns = encode_dns_query (buf, (gsize)len);
+        url = g_strdup_printf ("%s?dns=%s", urls[id], dns);
+
+        session->message = soup_message_new ("GET", url);
+    }
 
     flags = soup_message_get_flags (session->message);
     soup_message_set_flags (session->message, flags | SOUP_MESSAGE_IDEMPOTENT);
 
-    soup_message_set_request (session->message,
-                              "application/dns-message",
-                              SOUP_MEMORY_TAKE,
-                              (const char *)buf,
-                              (gsize)len);
+    if (methods[id] == NSS_TLS_METHOD_POST) {
+        soup_message_set_request (session->message,
+                                  "application/dns-message",
+                                  SOUP_MEMORY_TAKE,
+                                  (const char *)buf,
+                                  (gsize)len);
+    }
+
     soup_message_headers_append (session->message->request_headers,
                                  "Accept",
                                  "application/dns-message");

@@ -89,6 +89,14 @@ It is also possible to use multiple DoH servers:
 
 When nss-tls is configured like this, it pseudo-randomly chooses one of the servers, for each name lookup. The pseudo-random choice of the server is deterministic: if the same domain is resolved twice (e.g. for its IPv4 and IPv6 addresses, respectively), nss-tlsd will use the same DoH server for both queries. If nss-tlsd is restarted, it will keep using the same DoH server to resolve that domain. This contributes to privacy, since every DoH server sees only a portion of the user's browsing history.
 
+## Choosing the HTTP Method
+
+A standard DoH server should support both GET and POST requests. By default, nss-tlsd sends POST requests, beause they are faster to craft and tend to be smaller.
+
+However, one might wish to use GET requests if this makes a specific DoH server respond faster (for example, if the server does not cache responses to POST requests). This can be done by adding "+get" after the server URL:
+
+    meson configure -Dresolvers=dns.google/dns-query+get
+
 ## DoH Without Fallback to DNS
 
 If the DoH servers used by nss-tls are specified using their domain names, nss-tls needs a way to resolve the address of each DoH server and it cannot resolve it through itself.

@@ -50,7 +50,7 @@ ninja -C build install
 meson configure build -Dcache=false
 ninja -C build
 
-CC=clang meson --prefix=/usr -Dresolvers=9.9.9.9/dns-query,dns.google/dns-query,1.1.1.1/dns-query -Dcache=false -Ddeterministic=false -Db_sanitize=address build-asan
+CC=clang meson --prefix=/usr -Dresolvers=9.9.9.9/dns-query,dns.google/dns-query+get,1.1.1.1/dns-query -Dcache=false -Ddeterministic=false -Db_sanitize=address build-asan
 ninja -C build-asan nss-tlsd
 
 ldconfig
