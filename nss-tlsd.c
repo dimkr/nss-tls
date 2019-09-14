@@ -52,7 +52,10 @@
 
 enum nss_tls_methods {
     NSS_TLS_METHOD_POST,
-    NSS_TLS_METHOD_GET
+    NSS_TLS_METHOD_MIN = NSS_TLS_METHOD_POST,
+    NSS_TLS_METHOD_GET,
+    NSS_TLS_METHOD_MAX,
+    NSS_TLS_METHOD_RANDOM
 };
 
 struct nss_tls_session {
@@ -254,6 +257,7 @@ resolve_domain (struct nss_tls_session *session)
     int type, len;
     SoupMessageFlags flags;
     guint id = 0;
+    gint method;
 
 #ifdef NSS_TLS_CACHE
     if (get_cached_response (session)) {
@@ -290,7 +294,13 @@ resolve_domain (struct nss_tls_session *session)
     id = g_random_int_range (0, G_N_ELEMENTS (resolvers));
 #endif
 
-    if (resolvers[id].method == NSS_TLS_METHOD_POST) {
+    if (resolvers[id].method == NSS_TLS_METHOD_RANDOM) {
+        method = g_random_int_range (NSS_TLS_METHOD_MIN, NSS_TLS_METHOD_MAX);
+    } else {
+        method = (gint)resolvers[id].method;
+    }
+
+    if (method == NSS_TLS_METHOD_POST) {
         buf = g_malloc (MAX_REQ_SIZE);
     }
 
@@ -304,7 +314,7 @@ resolve_domain (struct nss_tls_session *session)
                        buf,
                        MAX_REQ_SIZE);
     if (len <= 1) {
-        if (resolvers[id].method == NSS_TLS_METHOD_POST) {
+        if (method == NSS_TLS_METHOD_POST) {
             g_free (buf);
         }
         return FALSE;
@@ -330,7 +340,7 @@ resolve_domain (struct nss_tls_session *session)
     session->response.cname[0] = '\0';
     session->type = (gint64)type;
 
-    if (resolvers[id].method == NSS_TLS_METHOD_POST) {
+    if (method == NSS_TLS_METHOD_POST) {
         session->message = soup_message_new ("POST", resolvers[id].url);
     } else {
         dns = encode_dns_query (buf, (gsize)len);
@@ -342,7 +352,7 @@ resolve_domain (struct nss_tls_session *session)
     flags = soup_message_get_flags (session->message);
     soup_message_set_flags (session->message, flags | SOUP_MESSAGE_IDEMPOTENT);
 
-    if (resolvers[id].method == NSS_TLS_METHOD_POST) {
+    if (method == NSS_TLS_METHOD_POST) {
         soup_message_set_request (session->message,
                                   "application/dns-message",
                                   SOUP_MEMORY_TAKE,

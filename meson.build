@@ -35,6 +35,8 @@ foreach resolver: resolvers
         resolver_method = 'NSS_TLS_METHOD_GET'
     elif resolver_method_name == 'post'
         resolver_method = 'NSS_TLS_METHOD_POST'
+    elif resolver_method_name == 'random'
+        resolver_method = 'NSS_TLS_METHOD_RANDOM'
     else
         error('Bad resolving method: @0@'.format(resolver_method_name))
     endif
