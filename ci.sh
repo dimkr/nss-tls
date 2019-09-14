@@ -24,12 +24,13 @@ ninja -C build install
 meson configure build -Dcache=false
 ninja -C build
 
-CC=clang-8 meson --prefix=/usr -Dresolvers=1.1.1.1/dns-query,9.9.9.9:5053/dns-query -Db_sanitize=address build-asan
+CC=clang-8 meson --prefix=/usr -Dresolvers=1.1.1.1/dns-query,9.9.9.9:5053/dns-query,dns.google/resolve -Db_sanitize=address build-asan
 ninja -C build-asan nss-tlsd
 
 ldconfig
 cp -f /etc/nsswitch.conf /tmp/
 sed 's/hosts:.*/hosts: files tls/' -i /etc/nsswitch.conf
+echo '8.8.8.8 dns.google' >> /etc/hosts
 G_MESSAGES_DEBUG=all ./build-asan/nss-tlsd &
 pid=$!
 sleep 1
@@ -37,10 +38,12 @@ sleep 1
 valgrind --leak-check=full --track-fds=yes --error-exitcode=1 tlslookup ipv4.google.com
 valgrind --leak-check=full --track-fds=yes --error-exitcode=1 tlslookup ipv6.google.com
 valgrind --leak-check=full --track-fds=yes --error-exitcode=1 tlslookup google.com
+valgrind --leak-check=full --track-fds=yes --error-exitcode=1 tlslookup baidu.com
 
 getent hosts ipv4.google.com
 getent hosts ipv6.google.com
 getent hosts google.com
+getent hosts baidu.com
 
 kill $pid
 sleep 1
