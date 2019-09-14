@@ -19,35 +19,38 @@
 project('nss-tls', 'c', version: '1.0', license : ['LGPL2.1+'])
 
 resolvers = get_option('resolvers').split(',')
-resolver_urls = []
-resolver_domains = []
-resolver_methods = []
+resolver_structs = []
 foreach resolver: resolvers
     resolver_tokens = resolver.split('+')
-    resolver_url = resolver_tokens[0]
+
     if resolver_tokens.length() == 2
-        resolver_method = resolver_tokens[1]
+        resolver_method_name = resolver_tokens[1]
     elif resolver_tokens.length() == 1
-        resolver_method = 'post'
+        resolver_method_name = 'post'
     else
         error('Bad resolver: @0@'.format(resolver))
     endif
 
-    resolver_domain = resolver_url.split('/')[0]
-    resolver_domains += ['"@0@"'.format(resolver_domain)]
-    resolver_urls += ['"https://@0@"'.format(resolver_url)]
-
-    if resolver_method == 'get'
-        resolver_methods += ['NSS_TLS_METHOD_GET']
-    elif resolver_method == 'post'
-        resolver_methods += ['NSS_TLS_METHOD_POST']
+    if resolver_method_name == 'get'
+        resolver_method = 'NSS_TLS_METHOD_GET'
+    elif resolver_method_name == 'post'
+        resolver_method = 'NSS_TLS_METHOD_POST'
     else
-        error('Bad resolving method: @0@'.format(resolver_method))
+        error('Bad resolving method: @0@'.format(resolver_method_name))
     endif
+
+    resolver_url = resolver_tokens[0]
+    resolver_domain = resolver_url.split('/')[0]
+
+    resolver_structs += [
+        '{.url = "https://@0@", .domain = "@1@", .method = @2@}'.format(
+            resolver_url,
+            resolver_domain,
+            resolver_method
+        )
+    ]
 endforeach
-resolver_urls = ','.join(resolver_urls)
-resolver_domains = ','.join(resolver_domains)
-resolver_methods = ','.join(resolver_methods)
+resolver_structs = ','.join(resolver_structs)
 
 nss_tls_socket_name = 'nss-tlsd.sock'
 nss_tls_socket_dir = '@0@/run/nss-tls'.format(get_option('localstatedir'))
@@ -61,9 +64,7 @@ nss_tlsd_path = join_paths(get_option('prefix'),
                            'nss-tlsd')
 
 add_project_arguments(
-    '-DNSS_TLS_RESOLVER_URLS=@0@'.format(resolver_urls),
-    '-DNSS_TLS_RESOLVER_DOMAINS=@0@'.format(resolver_domains),
-    '-DNSS_TLS_RESOLVER_METHODS=@0@'.format(resolver_methods),
+    '-DNSS_TLS_RESOLVERS=@0@'.format(resolver_structs),
     '-DNSS_TLS_SOCKET_NAME="@0@"'.format(nss_tls_socket_name),
     '-DNSS_TLS_SOCKET_DIR="@0@"'.format(nss_tls_socket_dir),
     '-DNSS_TLS_SOCKET_PATH="@0@"'.format(nss_tls_socket_path),

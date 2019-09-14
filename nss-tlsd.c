@@ -47,7 +47,7 @@
 #define MIN_TTL 10
 #define CACHE_SIZE 1024
 #define MAX_CONNS_PER_RESOLVER 10
-#define MAX_CONNS MAX_CONNS_PER_RESOLVER * G_N_ELEMENTS (urls)
+#define MAX_CONNS MAX_CONNS_PER_RESOLVER * G_N_ELEMENTS (resolvers)
 #define MAX_REQ_SIZE 512
 
 enum nss_tls_methods {
@@ -66,9 +66,11 @@ struct nss_tls_session {
 };
 
 static SoupSession *soup = NULL;
-static const gchar *urls[] = {NSS_TLS_RESOLVER_URLS};
-static const char *domains[] = {NSS_TLS_RESOLVER_DOMAINS};
-static const enum nss_tls_methods methods[] = {NSS_TLS_RESOLVER_METHODS};
+static const struct {
+    const gchar *url;
+    const gchar *domain;
+    enum nss_tls_methods method;
+} resolvers[] = {NSS_TLS_RESOLVERS};
 
 #ifdef NSS_TLS_CACHE
 
@@ -281,14 +283,14 @@ resolve_domain (struct nss_tls_session *session)
     }
 
 #ifdef NSS_TLS_DETERMINISTIC
-    if (G_N_ELEMENTS (urls) > 1) {
-        id = g_str_hash (session->request.name) % G_N_ELEMENTS (urls);
+    if (G_N_ELEMENTS (resolvers) > 1) {
+        id = g_str_hash (session->request.name) % G_N_ELEMENTS (resolvers);
     }
 #else
-    id = g_random_int_range (0, G_N_ELEMENTS (urls));
+    id = g_random_int_range (0, G_N_ELEMENTS (resolvers));
 #endif
 
-    if (methods[id] == NSS_TLS_METHOD_POST) {
+    if (resolvers[id].method == NSS_TLS_METHOD_POST) {
         buf = g_malloc (MAX_REQ_SIZE);
     }
 
@@ -302,7 +304,7 @@ resolve_domain (struct nss_tls_session *session)
                        buf,
                        MAX_REQ_SIZE);
     if (len <= 1) {
-        if (methods[id] == NSS_TLS_METHOD_POST) {
+        if (resolvers[id].method == NSS_TLS_METHOD_POST) {
             g_free (buf);
         }
         return FALSE;
@@ -314,11 +316,11 @@ resolve_domain (struct nss_tls_session *session)
      */
     buf[0] = buf[1] = 0;
 
-    if (G_N_ELEMENTS (urls) > 1) {
+    if (G_N_ELEMENTS (resolvers) > 1) {
         g_debug ("Resolving %s (%s) using %s",
                  session->request.name,
                  (session->request.af == AF_INET) ? "IPv4" : "IPv6",
-                 urls[id]);
+                 resolvers[id].url);
     } else {
         g_debug ("Resolving %s (%s)",
                  session->request.name,
@@ -328,11 +330,11 @@ resolve_domain (struct nss_tls_session *session)
     session->response.cname[0] = '\0';
     session->type = (gint64)type;
 
-    if (methods[id] == NSS_TLS_METHOD_POST) {
-        session->message = soup_message_new ("POST", urls[id]);
+    if (resolvers[id].method == NSS_TLS_METHOD_POST) {
+        session->message = soup_message_new ("POST", resolvers[id].url);
     } else {
         dns = encode_dns_query (buf, (gsize)len);
-        url = g_strdup_printf ("%s?dns=%s", urls[id], dns);
+        url = g_strdup_printf ("%s?dns=%s", resolvers[id].url, dns);
 
         session->message = soup_message_new ("GET", url);
     }
@@ -340,7 +342,7 @@ resolve_domain (struct nss_tls_session *session)
     flags = soup_message_get_flags (session->message);
     soup_message_set_flags (session->message, flags | SOUP_MESSAGE_IDEMPOTENT);
 
-    if (methods[id] == NSS_TLS_METHOD_POST) {
+    if (resolvers[id].method == NSS_TLS_METHOD_POST) {
         soup_message_set_request (session->message,
                                   "application/dns-message",
                                   SOUP_MEMORY_TAKE,
@@ -681,8 +683,8 @@ is_server_domain (const gchar *name)
 {
     gint i;
 
-    for (i = 0; i < G_N_ELEMENTS (domains); ++i) {
-        if (strcmp (name, domains[i]) == 0) {
+    for (i = 0; i < G_N_ELEMENTS (resolvers); ++i) {
+        if (strcmp (name, resolvers[i].domain) == 0) {
             g_debug ("%s is a DoH server domain", name);
             return TRUE;
         }
