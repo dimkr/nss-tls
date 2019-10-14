@@ -81,12 +81,6 @@ if get_option('cache')
     add_project_arguments('-DNSS_TLS_CACHE', language: 'c')
 endif
 
-if get_option('deterministic')
-    add_project_arguments('-DNSS_TLS_DETERMINISTIC', language: 'c')
-elif resolvers.length() > 1
-    warning('Disabling deterministic server choice may harm privacy')
-endif
-
 if get_option('buildtype').startswith('debug')
     add_project_arguments('-DNSS_TLS_DEBUG', language: 'c')
 endif

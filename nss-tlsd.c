@@ -75,8 +75,8 @@ static const struct {
     enum nss_tls_methods method;
 } resolvers[] = {NSS_TLS_RESOLVERS};
 
-#ifdef NSS_TLS_CACHE
-
+static gboolean cache = FALSE;
+static gboolean randomize = FALSE;
 static GHashTable *caches[2] = {NULL, NULL};
 
 static
@@ -201,8 +201,6 @@ get_cached_response (struct nss_tls_session *session)
     return TRUE;
 }
 
-#endif
-
 static
 void
 on_response (GObject         *source_object,
@@ -251,15 +249,12 @@ resolve_domain (struct nss_tls_session *session)
     static unsigned char sbuf[MAX_REQ_SIZE];
     unsigned char *buf = sbuf;
     g_autofree gchar *url = NULL, *dns = NULL;
-#ifdef NSS_TLS_CACHE
     GOutputStream *out;
-#endif
     int type, len;
     SoupMessageFlags flags;
     guint id = 0;
     gint method;
 
-#ifdef NSS_TLS_CACHE
     if (get_cached_response (session)) {
         out = g_io_stream_get_output_stream (G_IO_STREAM (session->connection));
         g_output_stream_write_all_async (out,
@@ -271,7 +266,6 @@ resolve_domain (struct nss_tls_session *session)
                                          session);
         return TRUE;
     }
-#endif
 
     switch (session->request.af) {
     case AF_INET:
@@ -286,13 +280,13 @@ resolve_domain (struct nss_tls_session *session)
         return FALSE;
     }
 
-#ifdef NSS_TLS_DETERMINISTIC
-    if (G_N_ELEMENTS (resolvers) > 1) {
-        id = g_str_hash (session->request.name) % G_N_ELEMENTS (resolvers);
+    if (randomize) {
+        id = g_random_int_range (0, G_N_ELEMENTS (resolvers));
+    } else {
+        if (G_N_ELEMENTS (resolvers) > 1) {
+            id = g_str_hash (session->request.name) % G_N_ELEMENTS (resolvers);
+        }
     }
-#else
-    id = g_random_int_range (0, G_N_ELEMENTS (resolvers));
-#endif
 
     if (resolvers[id].method == NSS_TLS_METHOD_RANDOM) {
         method = g_random_int_range (NSS_TLS_METHOD_MIN, NSS_TLS_METHOD_MAX);
@@ -552,10 +546,8 @@ on_body (GObject         *source_object,
         on_answer (session, session->dns, len, &msg, id, a_type, addrlen);
     }
 
-#ifdef NSS_TLS_CACHE
     /* we want to cache addresses or the lack of any addresses */
     add_to_cache (&session->request, &session->response);
-#endif
 
     if (session->response.cname[0] && (session->response.count == 0)) {
         resolve_cname (session);
@@ -791,9 +783,23 @@ on_term (gpointer user_data)
     return FALSE;
 }
 
+static GOptionEntry opts[] = {
+    {"cache", 'c', 0, G_OPTION_ARG_NONE, &cache, "Cache responses", NULL},
+    {
+        "random",
+        'r',
+        0,
+        G_OPTION_ARG_NONE,
+        &randomize,
+        "Choose a random server every time",
+        NULL
+    }
+};
+
 int main (int argc, char **argv)
 {
     static char root_socket[] = NSS_TLS_SOCKET_PATH;
+    GOptionContext *ctx;
     GMainLoop *loop;
     GSocketService *s;
     GSocketAddress *sa;
@@ -804,13 +810,21 @@ int main (int argc, char **argv)
     static SoupLogger *logger;
 #endif
     int mode = 0600;
+    gint i;
     uid_t uid;
     gid_t gid;
     gboolean root;
-#ifdef NSS_TLS_CACHE
-    gint i;
-    gboolean cache = TRUE;
-#endif
+
+    ctx = g_option_context_new (NULL);
+    g_option_context_add_main_entries (ctx, opts, NULL);
+    if (!g_option_context_parse (ctx, &argc, &argv, NULL)) {
+        return EXIT_FAILURE;
+    }
+    g_option_context_free (ctx);
+
+    if (randomize && (G_N_ELEMENTS (resolvers) > 1)) {
+        g_warning ("Disabling deterministic server choice may harm privacy");
+    }
 
     root = (geteuid () == 0);
     if (root) {
@@ -836,13 +850,6 @@ int main (int argc, char **argv)
         }
 
         mode = 0666;
-#ifdef NSS_TLS_CACHE
-        /*
-         * a user should not be allowed to determine whether or not another user
-         * resolved a domain, by checking how much time it takes to resolve it
-         */
-        cache = FALSE;
-#endif
     } else {
         runtime_dir = g_get_user_runtime_dir ();
         if (!runtime_dir) {
@@ -855,7 +862,6 @@ int main (int argc, char **argv)
                                     NULL);
     }
 
-#ifdef NSS_TLS_CACHE
     if (cache) {
         for (i = 0; i < G_N_ELEMENTS (caches); ++i) {
             caches[i] = g_hash_table_new_full (g_str_hash,
@@ -864,20 +870,17 @@ int main (int argc, char **argv)
                                                g_free);
         }
     }
-#endif
 
     g_unlink (user_socket);
     sa = g_unix_socket_address_new (user_socket);
     s = g_socket_service_new ();
     loop = g_main_loop_new (NULL, FALSE);
 
-#ifdef NSS_TLS_CACHE
     if (cache) {
         g_timeout_add_seconds (CACHE_CLEANUP_INTERVAL,
                                on_cache_cleanup,
                                NULL);
     }
-#endif
 
     soup = soup_session_new_with_options (SOUP_SESSION_TIMEOUT,
                                           NSS_TLS_TIMEOUT,
@@ -922,13 +925,11 @@ int main (int argc, char **argv)
         g_free (user_socket);
     }
     g_object_unref (sa);
-#ifdef NSS_TLS_CACHE
     if (cache) {
         for (i = G_N_ELEMENTS (caches) - 1; i >= 0; --i) {
             g_hash_table_unref (caches[i]);
         }
     }
-#endif
 
     return EXIT_SUCCESS;
 }

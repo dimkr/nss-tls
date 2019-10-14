@@ -23,7 +23,7 @@ Documentation=https://github.com/dimkr/nss-tls
 
 [Service]
 Type=simple
-ExecStart=@nss_tlsd_path@
+ExecStart=@nss_tlsd_path@ -c
 StandardOutput=null
 StandardError=null
 Restart=on-failure

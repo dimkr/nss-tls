@@ -47,17 +47,17 @@ IPV6_ONLY_DOMAINS="
 meson --prefix=/usr --buildtype=release -Dstrip=true build
 ninja -C build install
 
-meson configure build -Dcache=false
+meson configure build
 ninja -C build
 
-CC=clang meson --prefix=/usr -Dresolvers=9.9.9.9/dns-query+random,dns.google/dns-query+random,1.1.1.1/dns-query+random -Dcache=false -Ddeterministic=false -Db_sanitize=address build-asan
+CC=clang meson --prefix=/usr -Dresolvers=9.9.9.9/dns-query+random,dns.google/dns-query+random,1.1.1.1/dns-query+random -Db_sanitize=address build-asan
 ninja -C build-asan nss-tlsd
 
 ldconfig
 echo "8.8.8.8 dns.google" >> /etc/hosts
 cp -f /etc/nsswitch.conf /tmp/
 sed 's/hosts:.*/hosts: files tls/' -i /etc/nsswitch.conf
-G_MESSAGES_DEBUG=all ./build-asan/nss-tlsd | tee /tmp/nss-tlsd.log &
+G_MESSAGES_DEBUG=all ./build-asan/nss-tlsd -r | tee /tmp/nss-tlsd.log &
 pid=$!
 sleep 1
 
