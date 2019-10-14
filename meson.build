@@ -77,10 +77,6 @@ add_project_arguments(
     language: 'c'
 )
 
-if get_option('cache')
-    add_project_arguments('-DNSS_TLS_CACHE', language: 'c')
-endif
-
 if get_option('buildtype').startswith('debug')
     add_project_arguments('-DNSS_TLS_DEBUG', language: 'c')
 endif
