@@ -93,7 +93,7 @@ Alternatively, when building nss-tls, use the "resolvers" build option:
 It is also possible to use multiple DoH servers:
 
     [global]
-    resolvers=https://dns9.quad9.net/dns-query;https://cloudflare-dns.com/dns-query
+    resolvers=https://dns9.quad9.net/dns-query,https://cloudflare-dns.com/dns-query
 
 When nss-tls is configured like this, it pseudo-randomly chooses one of the servers, for each name lookup. The pseudo-random choice of the server is deterministic: if the same domain is resolved twice (e.g. for its IPv4 and IPv6 addresses, respectively), nss-tlsd will use the same DoH server for both queries. If nss-tlsd is restarted, it will keep using the same DoH server to resolve that domain. This contributes to privacy, since every DoH server sees only a portion of the user's browsing history.
 
@@ -113,7 +113,7 @@ If the DoH servers used by nss-tls are specified using their domain names, nss-t
 To build nss-tls without dependency on other resolving methods (like DNS), specify the DoH servers using their addresses, e.g.:
 
     [global]
-    resolvers=https://9.9.9.9/dns-query;https://1.1.1.1/dns-query
+    resolvers=https://9.9.9.9/dns-query,https://1.1.1.1/dns-query
 
 Alternatively, the DoH server addresses can be hardcoded using /etc/hosts, e.g:
 

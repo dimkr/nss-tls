@@ -76,7 +76,7 @@ tlslookup = executable('tlslookup',
 
 cfg = configuration_data()
 cfg.set('nss_tlsd_path', nss_tlsd_path)
-cfg.set('resolvers', ';'.join(get_option('resolvers').split(',')))
+cfg.set('resolvers', get_option('resolvers'))
 
 nss_tls_conf = configure_file(input: 'nss-tls.conf.in',
                               output: 'nss-tls.conf',

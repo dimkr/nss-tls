@@ -823,6 +823,8 @@ parse_cfg (const gboolean   root)
         return FALSE;
     }
 
+    g_key_file_set_list_separator (cfg, ',');
+
     list = g_key_file_get_string_list (cfg,
                                        "global",
                                        "resolvers",
