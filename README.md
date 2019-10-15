@@ -77,15 +77,23 @@ This will enable a system nss-tlsd instance for all non-interactive processes (w
 
 By default, nss-tls performs all name lookup through [Quad9](https://www.quad9.net/doh-quad9-dns-servers/).
 
-To use a different DoH server, use the "resolvers" build option:
+To use a different DoH server, change the "resolvers" key of nss-tlsd.conf:
 
-    meson configure -Dresolvers=https://cloudflare-dns.com/dns-query
+    [global]
+    resolvers=https://cloudflare-dns.com/dns-query
+
+nss-tlsd looks for nss-tlsd.conf in user's home directory (when running as an unprivileged user) and the system configuration file directory (usually /etc).
+
+Alternatively, when building nss-tls, use the "resolvers" build option:
+
+    meson configure -Dresolvers=cloudflare-dns.com/dns-query
 
 ## Using Multiple DoH Servers
 
 It is also possible to use multiple DoH servers:
 
-    meson configure -Dresolvers=https://dns9.quad9.net/dns-query,https://cloudflare-dns.com/dns-query
+    [global]
+    resolvers=https://dns9.quad9.net/dns-query;https://cloudflare-dns.com/dns-query
 
 When nss-tls is configured like this, it pseudo-randomly chooses one of the servers, for each name lookup. The pseudo-random choice of the server is deterministic: if the same domain is resolved twice (e.g. for its IPv4 and IPv6 addresses, respectively), nss-tlsd will use the same DoH server for both queries. If nss-tlsd is restarted, it will keep using the same DoH server to resolve that domain. This contributes to privacy, since every DoH server sees only a portion of the user's browsing history.
 
@@ -95,7 +103,8 @@ A standard DoH server should support both GET and POST requests. By default, nss
 
 However, one might wish to use GET requests if this makes a specific DoH server respond faster (for example, if the server does not cache responses to POST requests). This can be done by adding "+get" after the server URL:
 
-    meson configure -Dresolvers=https://dns.google/dns-query+get
+    [global]
+    resolvers=https://dns.google/dns-query+get
 
 ## DoH Without Fallback to DNS
 
@@ -103,12 +112,15 @@ If the DoH servers used by nss-tls are specified using their domain names, nss-t
 
 To build nss-tls without dependency on other resolving methods (like DNS), specify the DoH servers using their addresses, e.g.:
 
-    meson configure -Dresolvers=https://9.9.9.9/dns-query,https://1.1.1.1/dns-query
+    [global]
+    resolvers=https://9.9.9.9/dns-query;https://1.1.1.1/dns-query
 
 Alternatively, the DoH server addresses can be hardcoded using /etc/hosts, e.g:
 
     echo "8.8.8.8 dns.google" >> /etc/hosts
-    meson configure -Dresolvers=https://dns.google/dns-query
+
+    [global]
+    resolvers=https://dns.google/dns-query
 
 To disable DNS and use nss-tls exclusively, remove all DNS resolvers from the "hosts" entry in /etc/nsswitch.conf (but keep "tls").
 
@@ -120,9 +132,7 @@ Therefore, each nss-tls instance keeps established HTTPS connections open and re
 
 Therefore, in reality, DNS over HTTPS using nss-tls may be much faster than DNS.
 
-To disable the internal cache, use the "cache" build option:
-
-    meson configure -Dcache=false
+To disable the internal cache, run nss-tlsd without specifying the -c option.
 
 One may wish to use a system-wide cache that also covers DNS, instead of the internal cache of nss-tls; nscd(8) can do that. To enable system-wide cache on [Debian](http://www.debian.org/) and derivatives:
 

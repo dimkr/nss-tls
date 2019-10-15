@@ -795,13 +795,19 @@ parse_cfg (const gboolean   root)
     g_autoptr(GKeyFile) cfg = NULL;
     SoupURI *uri;
 
-    dirs[0] = NSS_TLS_SYSCONFDIR;
-    if (!root) {
-        dirs[1] = g_get_user_config_dir ();
-        if (!dirs[1]) {
+    if (root) {
+        dirs[0] = NSS_TLS_SYSCONFDIR;
+    } else {
+        dirs[0] = g_get_user_config_dir ();
+        if (dirs[0]) {
+            dirs[1] = NSS_TLS_SYSCONFDIR;
+        } else {
             user_dir = g_build_filename (g_get_home_dir (), ".config", NULL);
             if (user_dir) {
-                dirs[1] = user_dir;
+                dirs[0] = user_dir;
+                dirs[1] = NSS_TLS_SYSCONFDIR;
+            } else {
+                dirs[0] = NSS_TLS_SYSCONFDIR;
             }
         }
     }
