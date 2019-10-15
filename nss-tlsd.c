@@ -47,7 +47,7 @@
 #define MIN_TTL 10
 #define CACHE_SIZE 1024
 #define MAX_CONNS_PER_RESOLVER 10
-#define MAX_CONNS MAX_CONNS_PER_RESOLVER * G_N_ELEMENTS (resolvers)
+#define MAX_RESOLVERS 16
 #define MAX_REQ_SIZE 512
 
 enum nss_tls_methods {
@@ -69,11 +69,12 @@ struct nss_tls_session {
 };
 
 static SoupSession *soup = NULL;
-static const struct {
-    const gchar *url;
+static struct {
+    gchar *url;
     const gchar *domain;
     enum nss_tls_methods method;
-} resolvers[] = {NSS_TLS_RESOLVERS};
+} resolvers[MAX_RESOLVERS];
+gint32 nresolvers = 0;
 
 static gboolean cache = FALSE;
 static gboolean randomize = FALSE;
@@ -281,10 +282,10 @@ resolve_domain (struct nss_tls_session *session)
     }
 
     if (randomize) {
-        id = g_random_int_range (0, G_N_ELEMENTS (resolvers));
+        id = g_random_int_range (0, nresolvers);
     } else {
-        if (G_N_ELEMENTS (resolvers) > 1) {
-            id = g_str_hash (session->request.name) % G_N_ELEMENTS (resolvers);
+        if (nresolvers > 1) {
+            id = g_str_hash (session->request.name) % nresolvers;
         }
     }
 
@@ -320,7 +321,7 @@ resolve_domain (struct nss_tls_session *session)
      */
     buf[0] = buf[1] = 0;
 
-    if (G_N_ELEMENTS (resolvers) > 1) {
+    if (nresolvers > 1) {
         g_debug ("Resolving %s (%s) using %s",
                  session->request.name,
                  (session->request.af == AF_INET) ? "IPv4" : "IPv6",
@@ -685,7 +686,7 @@ is_server_domain (const gchar *name)
 {
     gint i;
 
-    for (i = 0; i < G_N_ELEMENTS (resolvers); ++i) {
+    for (i = 0; i < nresolvers; ++i) {
         if (strcmp (name, resolvers[i].domain) == 0) {
             g_debug ("%s is a DoH server domain", name);
             return TRUE;
@@ -783,6 +784,88 @@ on_term (gpointer user_data)
     return FALSE;
 }
 
+static
+gboolean
+parse_cfg (const gboolean   root)
+{
+    const gchar *dirs[3] = {NULL, NULL, NULL};
+    g_autofree gchar *user_dir = NULL;
+    gchar **list, **p;
+    char *plus;
+    g_autoptr(GKeyFile) cfg = NULL;
+    SoupURI *uri;
+
+    dirs[0] = NSS_TLS_SYSCONFDIR;
+    if (!root) {
+        dirs[1] = g_get_user_config_dir ();
+        if (!dirs[1]) {
+            user_dir = g_build_filename (g_get_home_dir (), ".config", NULL);
+            if (user_dir) {
+                dirs[1] = user_dir;
+            }
+        }
+    }
+
+    cfg = g_key_file_new ();
+
+    if (!g_key_file_load_from_dirs (cfg,
+                                    NSS_TLS_CONF_NAME,
+                                    dirs,
+                                    NULL,
+                                    G_KEY_FILE_NONE,
+                                    NULL)) {
+        return FALSE;
+    }
+
+    list = g_key_file_get_string_list (cfg,
+                                       "global",
+                                       "resolvers",
+                                       NULL,
+                                       NULL);
+    if (!list) {
+        return FALSE;
+    }
+
+    for (p = list; *p && (nresolvers < G_N_ELEMENTS (resolvers)); ++p) {
+        plus = strchr (*p, '+');
+        if (plus) {
+            *plus = '\0';
+            ++plus;
+        }
+
+        uri = soup_uri_new (*p);
+        if (!uri) {
+            g_warning ("Bad resolver: %s", *p);
+            g_free (*p);
+            continue;
+        }
+
+        resolvers[nresolvers].url = *p;
+        resolvers[nresolvers].domain = soup_uri_get_host (uri);
+        resolvers[nresolvers].method = NSS_TLS_METHOD_POST;
+
+        if (plus) {
+            if (strcmp(plus, "get") == 0) {
+                resolvers[nresolvers].method = NSS_TLS_METHOD_GET;
+            } else if (strcmp(plus, "random") == 0) {
+                resolvers[nresolvers].method = NSS_TLS_METHOD_RANDOM;
+            } else if (strcmp(plus, "post")) {
+                g_warning ("Unknown resolving method: %s", plus);
+            }
+        }
+
+        ++nresolvers;
+    }
+
+    g_free (list);
+
+    if (nresolvers == 0) {
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
 static GOptionEntry opts[] = {
     {"cache", 'c', 0, G_OPTION_ARG_NONE, &cache, "Cache responses", NULL},
     {
@@ -796,10 +879,29 @@ static GOptionEntry opts[] = {
     }
 };
 
-int main (int argc, char **argv)
+static
+gboolean
+parse_cmdline (int    argc,
+               char    **argv)
+{
+    GOptionContext *ctx;
+
+    ctx = g_option_context_new (NULL);
+
+    g_option_context_add_main_entries (ctx, opts, NULL);
+    if (!g_option_context_parse (ctx, &argc, &argv, NULL)) {
+        return FALSE;
+    }
+
+    g_option_context_free (ctx);
+    return TRUE;
+}
+
+int
+main (int    argc,
+      char    **argv)
 {
     static char root_socket[] = NSS_TLS_SOCKET_PATH;
-    GOptionContext *ctx;
     GMainLoop *loop;
     GSocketService *s;
     GSocketAddress *sa;
@@ -815,15 +917,8 @@ int main (int argc, char **argv)
     gid_t gid;
     gboolean root;
 
-    ctx = g_option_context_new (NULL);
-    g_option_context_add_main_entries (ctx, opts, NULL);
-    if (!g_option_context_parse (ctx, &argc, &argv, NULL)) {
+    if (!parse_cmdline (argc, argv)) {
         return EXIT_FAILURE;
-    }
-    g_option_context_free (ctx);
-
-    if (randomize && (G_N_ELEMENTS (resolvers) > 1)) {
-        g_warning ("Disabling deterministic server choice may harm privacy");
     }
 
     root = (geteuid () == 0);
@@ -862,6 +957,14 @@ int main (int argc, char **argv)
                                     NULL);
     }
 
+    if (!parse_cfg (root)) {
+        return EXIT_FAILURE;
+    }
+
+    if (randomize && (nresolvers > 1)) {
+        g_warning ("Disabling deterministic server choice may harm privacy");
+    }
+
     if (cache) {
         for (i = 0; i < G_N_ELEMENTS (caches); ++i) {
             caches[i] = g_hash_table_new_full (g_str_hash,
@@ -891,7 +994,7 @@ int main (int argc, char **argv)
                                           SOUP_SESSION_MAX_CONNS_PER_HOST,
                                           MAX_CONNS_PER_RESOLVER,
                                           SOUP_SESSION_MAX_CONNS,
-                                          MAX_CONNS,
+                                          MAX_CONNS_PER_RESOLVER * nresolvers,
                                           NULL);
 #ifdef NSS_TLS_DEBUG
     logger = soup_logger_new (SOUP_LOGGER_LOG_BODY, 128);
@@ -917,6 +1020,10 @@ int main (int argc, char **argv)
     g_unix_signal_add (SIGTERM, on_term, loop);
 
     g_main_loop_run (loop);
+
+    for (i = 0; i < nresolvers; ++i) {
+        g_free (resolvers[i].url);
+    }
 
     g_main_loop_unref (loop);
     g_object_unref (s);

@@ -79,13 +79,13 @@ By default, nss-tls performs all name lookup through [Quad9](https://www.quad9.n
 
 To use a different DoH server, use the "resolvers" build option:
 
-    meson configure -Dresolvers=cloudflare-dns.com/dns-query
+    meson configure -Dresolvers=https://cloudflare-dns.com/dns-query
 
 ## Using Multiple DoH Servers
 
 It is also possible to use multiple DoH servers:
 
-    meson configure -Dresolvers=dns9.quad9.net/dns-query,cloudflare-dns.com/dns-query
+    meson configure -Dresolvers=https://dns9.quad9.net/dns-query,https://cloudflare-dns.com/dns-query
 
 When nss-tls is configured like this, it pseudo-randomly chooses one of the servers, for each name lookup. The pseudo-random choice of the server is deterministic: if the same domain is resolved twice (e.g. for its IPv4 and IPv6 addresses, respectively), nss-tlsd will use the same DoH server for both queries. If nss-tlsd is restarted, it will keep using the same DoH server to resolve that domain. This contributes to privacy, since every DoH server sees only a portion of the user's browsing history.
 
@@ -95,7 +95,7 @@ A standard DoH server should support both GET and POST requests. By default, nss
 
 However, one might wish to use GET requests if this makes a specific DoH server respond faster (for example, if the server does not cache responses to POST requests). This can be done by adding "+get" after the server URL:
 
-    meson configure -Dresolvers=dns.google/dns-query+get
+    meson configure -Dresolvers=https://dns.google/dns-query+get
 
 ## DoH Without Fallback to DNS
 
@@ -103,12 +103,12 @@ If the DoH servers used by nss-tls are specified using their domain names, nss-t
 
 To build nss-tls without dependency on other resolving methods (like DNS), specify the DoH servers using their addresses, e.g.:
 
-    meson configure -Dresolvers=9.9.9.9/dns-query,1.1.1.1/dns-query
+    meson configure -Dresolvers=https://9.9.9.9/dns-query,https://1.1.1.1/dns-query
 
 Alternatively, the DoH server addresses can be hardcoded using /etc/hosts, e.g:
 
     echo "8.8.8.8 dns.google" >> /etc/hosts
-    meson configure -Dresolvers=dns.google/dns-query
+    meson configure -Dresolvers=https://dns.google/dns-query
 
 To disable DNS and use nss-tls exclusively, remove all DNS resolvers from the "hosts" entry in /etc/nsswitch.conf (but keep "tls").
 

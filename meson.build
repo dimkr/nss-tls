@@ -16,46 +16,15 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-project('nss-tls', 'c', version: '1.0', license : ['LGPL2.1+'])
+project('nss-tls', 'c', version: '1.9', license : ['LGPL2.1+'])
 
-resolvers = get_option('resolvers').split(',')
-resolver_structs = []
-foreach resolver: resolvers
-    resolver_tokens = resolver.split('+')
-
-    if resolver_tokens.length() == 2
-        resolver_method_name = resolver_tokens[1]
-    elif resolver_tokens.length() == 1
-        resolver_method_name = 'post'
-    else
-        error('Bad resolver: @0@'.format(resolver))
-    endif
-
-    if resolver_method_name == 'get'
-        resolver_method = 'NSS_TLS_METHOD_GET'
-    elif resolver_method_name == 'post'
-        resolver_method = 'NSS_TLS_METHOD_POST'
-    elif resolver_method_name == 'random'
-        resolver_method = 'NSS_TLS_METHOD_RANDOM'
-    else
-        error('Bad resolving method: @0@'.format(resolver_method_name))
-    endif
-
-    resolver_url = resolver_tokens[0]
-    resolver_domain = resolver_url.split('/')[0]
-
-    resolver_structs += [
-        '{.url = "https://@0@", .domain = "@1@", .method = @2@}'.format(
-            resolver_url,
-            resolver_domain,
-            resolver_method
-        )
-    ]
-endforeach
-resolver_structs = ','.join(resolver_structs)
+prefix = get_option('prefix')
+sys_conf_dir = get_option('sysconfdir')
+local_state_dir = get_option('localstatedir')
 
 nss_tls_socket_name = 'nss-tlsd.sock'
-nss_tls_socket_dir = '@0@/run/nss-tls'.format(get_option('localstatedir'))
+nss_tls_conf_name = 'nss-tls.conf'
+nss_tls_socket_dir = '@0@/run/nss-tls'.format(join_paths(prefix, local_state_dir))
 nss_tls_socket_path = '@0@/@1@'.format(nss_tls_socket_dir, nss_tls_socket_name)
 nss_tls_user = get_option('user')
 nss_tls_group = get_option('group')
@@ -66,14 +35,15 @@ nss_tlsd_path = join_paths(get_option('prefix'),
                            'nss-tlsd')
 
 add_project_arguments(
-    '-DNSS_TLS_RESOLVERS=@0@'.format(resolver_structs),
     '-DNSS_TLS_SOCKET_NAME="@0@"'.format(nss_tls_socket_name),
+    '-DNSS_TLS_CONF_NAME="@0@"'.format(nss_tls_conf_name),
     '-DNSS_TLS_SOCKET_DIR="@0@"'.format(nss_tls_socket_dir),
     '-DNSS_TLS_SOCKET_PATH="@0@"'.format(nss_tls_socket_path),
     '-DNSS_TLS_TIMEOUT=@0@'.format(get_option('timeout')),
     '-DNSS_TLS_USER_AGENT="@0@"'.format(nss_tls_user_agent),
     '-DNSS_TLS_USER="@0@"'.format(nss_tls_user),
     '-DNSS_TLS_GROUP="@0@"'.format(nss_tls_group),
+    '-DNSS_TLS_SYSCONFDIR="@0@"'.format(join_paths(prefix, sys_conf_dir)),
     language: 'c'
 )
 
@@ -104,11 +74,17 @@ tlslookup = executable('tlslookup',
                        link_with: libnss_tls,
                        install: true)
 
+cfg = configuration_data()
+cfg.set('nss_tlsd_path', nss_tlsd_path)
+cfg.set('resolvers', ';'.join(get_option('resolvers').split(',')))
+
+nss_tls_conf = configure_file(input: 'nss-tls.conf.in',
+                              output: 'nss-tls.conf',
+                              configuration: cfg)
+install_data(nss_tls_conf, install_dir: sys_conf_dir)
+
 systemd = dependency('systemd', required: false)
 if systemd.found()
-    cfg = configuration_data()
-    cfg.set('nss_tlsd_path', nss_tlsd_path)
-
     nss_tlsd_service = configure_file(input: 'nss-tlsd.service.in',
                                       output: 'nss-tlsd.service',
                                       configuration: cfg)

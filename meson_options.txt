@@ -1,7 +1,7 @@
 option(
     'resolvers',
     type: 'string',
-    value: 'dns9.quad9.net/dns-query',
+    value: 'https://dns9.quad9.net/dns-query',
     description: 'Comma-delimited URLs of DoH servers to use'
 )
 
