@@ -119,6 +119,8 @@ Alternatively, the DoH server addresses can be hardcoded using /etc/hosts, e.g:
 
     echo "8.8.8.8 dns.google" >> /etc/hosts
 
+Then, the DoH server can be specified by its domain name:
+
     [global]
     resolvers=https://dns.google/dns-query
 
