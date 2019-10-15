@@ -845,11 +845,11 @@ parse_cfg (const gboolean   root)
         resolvers[nresolvers].method = NSS_TLS_METHOD_POST;
 
         if (plus) {
-            if (strcmp(plus, "get") == 0) {
+            if (strcmp (plus, "get") == 0) {
                 resolvers[nresolvers].method = NSS_TLS_METHOD_GET;
-            } else if (strcmp(plus, "random") == 0) {
+            } else if (strcmp (plus, "random") == 0) {
                 resolvers[nresolvers].method = NSS_TLS_METHOD_RANDOM;
-            } else if (strcmp(plus, "post")) {
+            } else if (strcmp (plus, "post")) {
                 g_warning ("Unknown resolving method: %s", plus);
             }
         }
@@ -885,16 +885,15 @@ parse_cmdline (int    argc,
                char    **argv)
 {
     GOptionContext *ctx;
+    gboolean ret;
 
     ctx = g_option_context_new (NULL);
 
     g_option_context_add_main_entries (ctx, opts, NULL);
-    if (!g_option_context_parse (ctx, &argc, &argv, NULL)) {
-        return FALSE;
-    }
+    ret = g_option_context_parse (ctx, &argc, &argv, NULL);
 
     g_option_context_free (ctx);
-    return TRUE;
+    return ret;
 }
 
 int
