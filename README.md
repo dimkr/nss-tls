@@ -32,7 +32,7 @@ nss-tls consists of three parts:
 
 An unprivileged user can start a private, unprivileged instance of nss-tlsd and libnss-tls.so will automatically use that one, instead of the system-wide instance of nss-tlsd. Each user's nss-tls instance holds its own cache of lookup results, to speed up resolving. Because the cache is not shared with other users, it remains "hot" even if other users resolve many names.
 
-Users who don't have such a private instance will continue to use the system-wide instance, which does not perform caching, to prevent a user from extracting the browsing history of another user, using timing-based methods. In addition, nss-tlsd drops its privileges to greatly reduce its attack surface.
+Users who don't have such a private instance will continue to use the system-wide instance. which does not perform caching by default, to prevent a user from extracting the browsing history of another user, using timing-based methods. In addition, nss-tlsd drops its privileges to greatly reduce its attack surface.
 
 Also, nss-tls is capable of using multiple DoH servers, with a deterministic algorithm that chooses which server to use to resolve a domain. This way, no DoH server can track the user's entire browsing history.
 
@@ -77,12 +77,12 @@ This will enable a system nss-tlsd instance for all non-interactive processes (w
 
 By default, nss-tls performs all name lookup through [Quad9](https://www.quad9.net/doh-quad9-dns-servers/).
 
-To use a different DoH server, change the "resolvers" key of nss-tlsd.conf:
+To use a different DoH server, change the "resolvers" key of nss-tls.conf:
 
     [global]
     resolvers=https://cloudflare-dns.com/dns-query
 
-nss-tlsd looks for nss-tlsd.conf in user's home directory (when running as an unprivileged user) and the system configuration file directory (usually /etc).
+nss-tlsd looks for nss-tls.conf in user's home directory (when running as an unprivileged user) and the system configuration file directory (usually /etc).
 
 Alternatively, when building nss-tls, use the "resolvers" build option:
 
@@ -130,11 +130,9 @@ To disable DNS and use nss-tls exclusively, remove all DNS resolvers from the "h
 
 On paper, DNS over HTTPS is much slower than DNS, due to the overhead of TCP and TLS.
 
-Therefore, each nss-tls instance keeps established HTTPS connections open and reuses them. Also, by default, each user's nss-tls instance maintains an internal cache of lookup results. In this cache, IPv4 and IPv6 addresses are stored in separate hash tables, to make the cache faster to iterate over.
+Therefore, each nss-tls instance keeps established HTTPS connections open and reuses them. Also, if running with the -c option, each user's nss-tls instance maintains an internal cache of lookup results. In this cache, IPv4 and IPv6 addresses are stored in separate hash tables, to make the cache faster to iterate over.
 
 Therefore, in reality, DNS over HTTPS using nss-tls may be much faster than DNS.
-
-To disable the internal cache, run nss-tlsd without specifying the -c option.
 
 One may wish to use a system-wide cache that also covers DNS, instead of the internal cache of nss-tls; nscd(8) can do that. To enable system-wide cache on [Debian](http://www.debian.org/) and derivatives:
 
