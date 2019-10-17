@@ -283,10 +283,8 @@ resolve_domain (struct nss_tls_session *session)
 
     if (randomize) {
         id = g_random_int_range (0, nresolvers);
-    } else {
-        if (nresolvers > 1) {
-            id = g_str_hash (session->request.name) % nresolvers;
-        }
+    } else if (nresolvers > 1) {
+        id = g_str_hash (session->request.name) % nresolvers;
     }
 
     if (resolvers[id].method == NSS_TLS_METHOD_RANDOM) {
@@ -966,6 +964,10 @@ main (int    argc,
 
     if (!parse_cfg (root)) {
         return EXIT_FAILURE;
+    }
+
+    if (root && cache) {
+        g_warning ("Enabling cache when running as root may harm privacy");
     }
 
     if (randomize && (nresolvers > 1)) {
