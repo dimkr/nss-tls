@@ -79,6 +79,8 @@ gint32 nresolvers = 0;
 static gboolean cache = FALSE;
 static gboolean randomize = FALSE;
 static GHashTable *caches[2] = {NULL, NULL};
+static GFile *cfg_file = NULL;
+static GFileMonitor *cfg_monitor = NULL;
 
 static
 gboolean
@@ -784,11 +786,68 @@ on_term (gpointer user_data)
 
 static
 gboolean
-parse_cfg (const gboolean   root)
+parse_cfg (const gboolean    root,
+           const gboolean    watch);
+
+static
+void
+on_cfg_changed (GFileMonitor        *monitor,
+                GFile                *file,
+                GFile                *other_file,
+                GFileMonitorEvent    event_type,
+                gpointer            user_data)
+{
+    gboolean root = (gboolean)(gintptr)user_data;
+    gint pnresolvers = nresolvers, i;
+
+    if ((event_type != G_FILE_MONITOR_EVENT_CHANGES_DONE_HINT) &&
+        (event_type != G_FILE_MONITOR_EVENT_DELETED)) {
+        return;
+    }
+
+    if (!parse_cfg (root, FALSE)) {
+        return;
+    }
+
+    for (i = 0; i < pnresolvers; ++i) {
+        g_free (resolvers[i].url);
+    }
+
+    nresolvers -= pnresolvers;
+    memcpy (resolvers,
+            &resolvers[pnresolvers],
+            sizeof (resolvers[0]) * nresolvers);
+}
+
+static
+void
+watch_cfg (const gchar        *path,
+           const gboolean    root)
+{
+    cfg_file = g_file_new_for_path (path);
+
+    cfg_monitor = g_file_monitor_file (cfg_file,
+                                       G_FILE_MONITOR_NONE,
+                                       NULL,
+                                       NULL);
+    if (cfg_monitor) {
+        g_signal_connect (cfg_monitor,
+                          "changed", G_CALLBACK (on_cfg_changed),
+                          (gpointer)(gintptr)root);
+    } else {
+        g_object_unref (cfg_file);
+        cfg_file = NULL;
+    }
+}
+
+static
+gboolean
+parse_cfg (const gboolean    root,
+           const gboolean    watch)
 {
     const gchar *dirs[3] = {NULL, NULL, NULL};
     g_autofree gchar *user_dir = NULL;
-    gchar **list, **p;
+    gchar **list, **p, *path;
     char *plus;
     g_autoptr(GKeyFile) cfg = NULL;
     SoupURI *uri;
@@ -815,7 +874,7 @@ parse_cfg (const gboolean   root)
     if (!g_key_file_load_from_dirs (cfg,
                                     NSS_TLS_CONF_NAME,
                                     dirs,
-                                    NULL,
+                                    &path,
                                     G_KEY_FILE_NONE,
                                     NULL)) {
         return FALSE;
@@ -867,6 +926,10 @@ parse_cfg (const gboolean   root)
 
     if (nresolvers == 0) {
         return FALSE;
+    }
+
+    if (watch) {
+        watch_cfg (path, root);
     }
 
     return TRUE;
@@ -962,7 +1025,7 @@ main (int    argc,
                                     NULL);
     }
 
-    if (!parse_cfg (root)) {
+    if (!parse_cfg (root, TRUE)) {
         return EXIT_FAILURE;
     }
 
@@ -1041,6 +1104,12 @@ main (int    argc,
         g_free (user_socket);
     }
     g_object_unref (sa);
+
+    if (cfg_monitor) {
+        g_object_unref (cfg_monitor);
+        g_object_unref (cfg_file);
+    }
+
     if (cache) {
         for (i = G_N_ELEMENTS (caches) - 1; i >= 0; --i) {
             g_hash_table_unref (caches[i]);
