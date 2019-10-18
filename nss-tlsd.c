@@ -786,8 +786,7 @@ on_term (gpointer user_data)
 
 static
 gboolean
-parse_cfg (const gboolean    root,
-           const gboolean    watch);
+parse_cfg (const gboolean   root);
 
 static
 void
@@ -805,7 +804,11 @@ on_cfg_changed (GFileMonitor        *monitor,
         return;
     }
 
-    if (!parse_cfg (root, FALSE)) {
+    g_object_unref (cfg_monitor);
+    cfg_monitor = NULL;
+    g_object_unref (cfg_file);
+
+    if (!parse_cfg (root)) {
         return;
     }
 
@@ -821,8 +824,8 @@ on_cfg_changed (GFileMonitor        *monitor,
 
 static
 void
-watch_cfg (const gchar        *path,
-           const gboolean    root)
+watch_cfg (const gchar      *path,
+           const gboolean   root)
 {
     cfg_file = g_file_new_for_path (path);
 
@@ -842,8 +845,7 @@ watch_cfg (const gchar        *path,
 
 static
 gboolean
-parse_cfg (const gboolean    root,
-           const gboolean    watch)
+parse_cfg (const gboolean   root)
 {
     const gchar *dirs[3] = {NULL, NULL, NULL};
     g_autofree gchar *user_dir = NULL;
@@ -928,9 +930,7 @@ parse_cfg (const gboolean    root,
         return FALSE;
     }
 
-    if (watch) {
-        watch_cfg (path, root);
-    }
+    watch_cfg (path, root);
 
     return TRUE;
 }
@@ -1025,7 +1025,7 @@ main (int    argc,
                                     NULL);
     }
 
-    if (!parse_cfg (root, TRUE)) {
+    if (!parse_cfg (root)) {
         return EXIT_FAILURE;
     }
 
