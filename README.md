@@ -97,7 +97,7 @@ It is also possible to use multiple DoH servers:
     [global]
     resolvers=https://dns9.quad9.net/dns-query,https://cloudflare-dns.com/dns-query
 
-When nss-tls is configured like this, it pseudo-randomly chooses one of the servers, for each name lookup. The pseudo-random choice of the server is deterministic: if the same domain is resolved twice (e.g. for its IPv4 and IPv6 addresses, respectively), nss-tlsd will use the same DoH server for both queries. If nss-tlsd is restarted, it will keep using the same DoH server to resolve that domain. This contributes to privacy, since every DoH server sees only a portion of the user's browsing history.
+When nss-tls is configured like this, it pseudo-randomly chooses one of the servers, for each name lookup. The choice of the server is consistent: if the same domain is resolved twice (e.g. for its IPv4 and IPv6 addresses, respectively), nss-tlsd will use the same DoH server for both queries. If nss-tlsd is restarted, it will keep using the same DoH server to resolve that domain. This contributes to privacy, since every DoH server sees only a portion of the user's browsing history.
 
 ## Choosing the HTTP Method
 
