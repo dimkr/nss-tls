@@ -82,7 +82,7 @@ To use a different DoH server, change the "resolvers" key of nss-tls.conf:
     [global]
     resolvers=https://cloudflare-dns.com/dns-query
 
-nss-tlsd looks for nss-tls.conf in user's home directory (usually under .config, but only when running as an unprivileged user) and the system configuration file directory (usually /etc). If both files exist, nss-tlsd prefers the user's one.
+nss-tlsd looks for nss-tls.conf in user's home directory (only when running as an unprivileged user; usually under .config) and the system configuration file directory (usually /etc). If both files exist, nss-tlsd prefers the user's one.
 
 nss-tlsd monitors the chosen configuration file for changes and deletion, so changes are applied without having to restart nss-tlsd.
 
