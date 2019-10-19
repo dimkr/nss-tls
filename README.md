@@ -24,19 +24,19 @@ This way, all applications that use the standard resolver API (getaddrinfo(), ge
 
 nss-tls consists of three parts:
 
-* nss-tlsd runs in the background and receives name resolving requests over a Unix socket.
-* libnss_tls.so is a tiny client library, which delegates the resolving work to nss-tlsd through the Unix socket and passes the results back to the application, without dependencies other than libc. This way, applications that resolve through nss-tls are not affected by the complexity and resource consumption of runtime libraries (e.g. libstdc++) and dependency libraries, or the constraints they impose on applications that load them (like signal or thread safety issues).
+* nss-tlsd runs in the background, receives name resolving requests over a Unix socket and replies with resolved addresses.
+* libnss_tls.so is a tiny client library, which delegates the resolving work to nss-tlsd through the Unix socket and passes the results back to the application, without dependencies other than libc. This way, applications that resolve through nss-tls are not affected by the complexity and resource consumption of runtime libraries (e.g. libstdc++) and dependency libraries used by nss-tlsd, or the constraints they impose on applications that load them (like signal or thread safety issues).
 * tlslookup is equivalent to nslookup(1), but uses libnss_tls.so instead of DNS.
 
 ## Security and Privacy
 
-An unprivileged user can start a private, unprivileged instance of nss-tlsd and libnss-tls.so will automatically use that one, instead of the system-wide instance of nss-tlsd. Each user's nss-tls instance holds its own cache of lookup results, to speed up resolving. Because the cache is not shared with other users, it remains "hot" even if other users resolve many names.
+An unprivileged user can start a private, unprivileged instance of nss-tlsd and libnss-tls.so will automatically use that one, instead of the system-wide instance of nss-tlsd. Each user's nss-tlsd instance holds its own cache of lookup results, to speed up resolving. Because the cache is not shared with other users, it remains "hot" even if other users resolve many names.
 
 Users who don't have such a private instance will continue to use the system-wide instance. which does not perform caching by default, to prevent a user from extracting the browsing history of another user, using timing-based methods. In addition, nss-tlsd drops its privileges to greatly reduce its attack surface.
 
-Also, nss-tls is capable of using multiple DoH servers, with a deterministic algorithm that chooses which server to use to resolve a domain. This way, no DoH server can track the user's entire browsing history.
+Also, nss-tlsd is capable of using multiple DoH servers, with a deterministic algorithm that chooses which server to use to resolve a domain. This way, no DoH server can track the user's entire browsing history.
 
-To avoid bloat, duplicate effort and potential remotely-exploitable vulnerabilities, nss-tls use the libc API for building DNS queries and parsing responses, instead of implementing its own parser.
+To avoid bloat, duplicate effort and potential remotely-exploitable vulnerabilities, nss-tlsd use the libc API for building DNS queries and parsing responses, instead of implementing its own parser.
 
 ## Dependencies
 
@@ -47,7 +47,7 @@ nss-tls depends on:
 
 If [systemd](https://www.freedesktop.org/wiki/Software/systemd/) is present, the installation of nss-tls includes unit files for nss-tlsd.
 
-However, nss-tlsd does not depend on [systemd](https://www.freedesktop.org/wiki/Software/systemd/). When [systemd](https://www.freedesktop.org/wiki/Software/systemd/) is not present, other means of running a nss-tlsd instance for each user (e.g. xinitrc) and root (e.g. an init script) should be used.
+However, nss-tls does not depend on [systemd](https://www.freedesktop.org/wiki/Software/systemd/). When [systemd](https://www.freedesktop.org/wiki/Software/systemd/) is not present, other means of running a nss-tlsd instance for each user (e.g. xinitrc) and root (e.g. an init script) should be used.
 
 nss-tls uses [Meson](http://mesonbuild.com/) as its build system.
 
