@@ -86,7 +86,7 @@ nss-tlsd looks for nss-tls.conf in user's home directory (only when running as a
 
 nss-tlsd monitors the chosen configuration file for changes and deletion, so changes are applied without having to restart nss-tlsd.
 
-Alternatively, when building nss-tls, use the "resolvers" build option:
+To change the server selection in the default configuration file created at build time, use the "resolvers" build option:
 
     meson configure -Dresolvers=cloudflare-dns.com/dns-query
 
