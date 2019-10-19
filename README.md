@@ -36,7 +36,7 @@ Users who don't have such a private instance will continue to use the system-wid
 
 Also, nss-tlsd is capable of using multiple DoH servers, with a deterministic algorithm that chooses which server to use to resolve a domain. This way, no DoH server can track the user's entire browsing history.
 
-To avoid bloat, duplicate effort and potential remotely-exploitable vulnerabilities, nss-tlsd use the libc API for building DNS queries and parsing responses, instead of implementing its own parser.
+To avoid bloat, duplicate effort and potential remotely-exploitable vulnerabilities, nss-tlsd uses the libc API for building DNS queries and parsing responses, instead of implementing its own parser.
 
 ## Dependencies
 
