@@ -70,6 +70,7 @@ struct nss_tls_session {
 
 static SoupSession *soup = NULL;
 static struct {
+    SoupURI *uri;
     gchar *url;
     const gchar *domain;
     enum nss_tls_methods method;
@@ -790,19 +791,9 @@ parse_cfg (const gboolean   root);
 
 static
 void
-on_cfg_changed (GFileMonitor        *monitor,
-                GFile                *file,
-                GFile                *other_file,
-                GFileMonitorEvent    event_type,
-                gpointer            user_data)
+update_cfg (const gboolean    root)
 {
-    gboolean root = (gboolean)(gintptr)user_data;
     gint pnresolvers = nresolvers, i;
-
-    if ((event_type != G_FILE_MONITOR_EVENT_CHANGES_DONE_HINT) &&
-        (event_type != G_FILE_MONITOR_EVENT_DELETED)) {
-        return;
-    }
 
     g_object_unref (cfg_monitor);
     cfg_monitor = NULL;
@@ -813,6 +804,7 @@ on_cfg_changed (GFileMonitor        *monitor,
     }
 
     for (i = 0; i < pnresolvers; ++i) {
+        soup_uri_free (resolvers[i].uri);
         g_free (resolvers[i].url);
     }
 
@@ -820,6 +812,24 @@ on_cfg_changed (GFileMonitor        *monitor,
     memcpy (resolvers,
             &resolvers[pnresolvers],
             sizeof (resolvers[0]) * nresolvers);
+}
+
+static
+void
+on_cfg_changed (GFileMonitor        *monitor,
+                GFile                *file,
+                GFile                *other_file,
+                GFileMonitorEvent    event_type,
+                gpointer            user_data)
+{
+    gboolean root = (gboolean)(gintptr)user_data;
+
+    if ((event_type != G_FILE_MONITOR_EVENT_CHANGES_DONE_HINT) &&
+        (event_type != G_FILE_MONITOR_EVENT_DELETED)) {
+        return;
+    }
+
+    update_cfg (root);
 }
 
 static
@@ -844,6 +854,74 @@ watch_cfg (const gchar      *path,
 }
 
 static
+void
+on_net_changed (GNetworkMonitor        *mon,
+                gboolean             available,
+                gpointer             user_data)
+{
+    gboolean root = (gboolean)(gintptr)user_data;
+
+    if (available &&
+        (g_network_monitor_get_connectivity (mon) == G_NETWORK_CONNECTIVITY_FULL)) {
+        update_cfg (root);
+    }
+}
+
+static
+void
+watch_net (const gboolean    root)
+{
+    GNetworkMonitor *mon;
+
+    mon = g_network_monitor_get_default ();
+    if (!mon) {
+        return;
+    }
+
+    g_signal_connect (mon,
+                      "network-changed",
+                      G_CALLBACK (on_net_changed),
+                      (gpointer)(gintptr)root);
+}
+
+static
+void
+add_resolver (const int            af,
+              const void        *addr)
+{
+    char buf[INET6_ADDRSTRLEN];
+
+    inet_ntop(af, addr, buf, sizeof (buf));
+
+    resolvers[nresolvers].url = g_strjoin ("/", "https:/", buf, "dns-query", NULL);
+    resolvers[nresolvers].uri = soup_uri_new (resolvers[nresolvers].url);
+    resolvers[nresolvers].domain = soup_uri_get_host (resolvers[nresolvers].uri);
+    resolvers[nresolvers].method = NSS_TLS_METHOD_POST;
+
+    ++nresolvers;
+}
+
+static
+void
+use_dns_servers (void)
+{
+    struct __res_state res;
+    int i;
+
+    if (res_ninit(&res) < 0) {
+        return;
+    }
+
+    for (i = 0;
+         (i < res.nscount) && (nresolvers < G_N_ELEMENTS (resolvers));
+         ++i) {
+        add_resolver (AF_INET, &res.nsaddr_list[i].sin_addr);
+    }
+
+    /* TODO: handle IPv6 server addresses */
+}
+
+static
 gboolean
 parse_cfg (const gboolean   root)
 {
@@ -852,7 +930,7 @@ parse_cfg (const gboolean   root)
     gchar **list, **p, *path;
     char *plus;
     g_autoptr(GKeyFile) cfg = NULL;
-    SoupURI *uri;
+    g_autoptr(GError) err = NULL;
 
     if (root) {
         dirs[0] = NSS_TLS_SYSCONFDIR;
@@ -888,8 +966,14 @@ parse_cfg (const gboolean   root)
                                        "global",
                                        "resolvers",
                                        NULL,
-                                       NULL);
+                                       &err);
     if (!list) {
+        if (g_error_matches (err,
+                             G_KEY_FILE_ERROR,
+                             G_KEY_FILE_ERROR_KEY_NOT_FOUND)) {
+            use_dns_servers ();
+            goto parsed;
+        }
         return FALSE;
     }
 
@@ -900,15 +984,15 @@ parse_cfg (const gboolean   root)
             ++plus;
         }
 
-        uri = soup_uri_new (*p);
-        if (!uri) {
+        resolvers[nresolvers].uri = soup_uri_new (*p);
+        if (!resolvers[nresolvers].uri) {
             g_warning ("Bad resolver: %s", *p);
             g_free (*p);
             continue;
         }
 
         resolvers[nresolvers].url = *p;
-        resolvers[nresolvers].domain = soup_uri_get_host (uri);
+        resolvers[nresolvers].domain = soup_uri_get_host (resolvers[nresolvers].uri);
         resolvers[nresolvers].method = NSS_TLS_METHOD_POST;
 
         if (plus) {
@@ -926,11 +1010,13 @@ parse_cfg (const gboolean   root)
 
     g_free (list);
 
+parsed:
     if (nresolvers == 0) {
         return FALSE;
     }
 
     watch_cfg (path, root);
+    watch_net (root);
 
     return TRUE;
 }
@@ -1094,6 +1180,7 @@ main (int    argc,
     g_main_loop_run (loop);
 
     for (i = 0; i < nresolvers; ++i) {
+        soup_uri_free (resolvers[i].uri);
         g_free (resolvers[i].url);
     }
 
