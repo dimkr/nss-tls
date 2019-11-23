@@ -820,7 +820,7 @@ on_cfg_changed (GFileMonitor        *monitor,
                 GFile                *file,
                 GFile                *other_file,
                 GFileMonitorEvent    event_type,
-                gpointer            user_data)
+                gpointer             user_data)
 {
     gboolean root = (gboolean)(gintptr)user_data;
 
