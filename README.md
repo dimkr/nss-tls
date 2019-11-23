@@ -90,7 +90,7 @@ To change the server selection in the default configuration file created at buil
 
     meson configure -Dresolvers=cloudflare-dns.com/dns-query
 
-If the "resolvers" key is missing, nss-tlsd uses the DNS servers specified in /etc/resolv.conf, assuming they support DoH.
+If the "resolvers" key is missing, nss-tlsd uses the DNS servers specified in /etc/resolv.conf, assuming they support DoH. nss-tlsd reads the file every time network connectivity has changed.
 
 ## Using Multiple DoH Servers
 
