@@ -453,8 +453,7 @@ on_response (GObject         *source_object,
 
     if (session->response.cname[0] && (session->response.count == 0)) {
         resolve_cname (session);
-        return;
-    } else if (session->response.count > 0) {
+    } else {
 #ifdef NSS_TLS_CACHE
         add_to_cache (&session->request, &session->response);
 #endif
@@ -471,9 +470,9 @@ on_response (GObject         *source_object,
         g_debug ("Done querying %s (%hhu results)",
                  session->request.name,
                  session->response.count);
-
-        return;
     }
+
+    return;
 
 cleanup:
     if (j) {
