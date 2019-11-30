@@ -884,14 +884,13 @@ watch_resolv_conf (const gboolean    root)
 
 static
 void
-add_resolver (const int            af,
-              const void        *addr)
+add_resolver (const char    *addr)
 {
-    char buf[INET6_ADDRSTRLEN];
-
-    inet_ntop(af, addr, buf, sizeof (buf));
-
-    resolvers[nresolvers].url = g_strjoin ("/", "https:/", buf, "dns-query", NULL);
+    if (strchr (addr, ':')) {
+        resolvers[nresolvers].url = g_strconcat ("https://[", addr, "]/dns-query", NULL);
+    } else {
+        resolvers[nresolvers].url = g_strconcat ("https://", addr, "/dns-query", NULL);
+    }
     resolvers[nresolvers].uri = soup_uri_new (resolvers[nresolvers].url);
     resolvers[nresolvers].domain = soup_uri_get_host (resolvers[nresolvers].uri);
     resolvers[nresolvers].method = NSS_TLS_METHOD_POST;
@@ -903,20 +902,50 @@ static
 void
 use_dns_servers (void)
 {
-    struct __res_state res;
-    int i;
+    GFile *file;
+    GFileInputStream *fio;
+    GDataInputStream *in;
+    char *line;
 
-    if (res_ninit(&res) < 0) {
+    if (nresolvers >= G_N_ELEMENTS (resolvers)) {
         return;
     }
 
-    for (i = 0;
-         (i < res.nscount) && (nresolvers < G_N_ELEMENTS (resolvers));
-         ++i) {
-        add_resolver (AF_INET, &res.nsaddr_list[i].sin_addr);
+    file = g_file_new_for_path (_PATH_RESCONF);
+    if (!file) {
+        return;
     }
 
-    /* TODO: handle IPv6 server addresses */
+    fio = g_file_read (file, NULL, NULL);
+    if (!fio) {
+        g_object_unref (file);
+        return;
+    }
+
+    in = g_data_input_stream_new (G_INPUT_STREAM (fio));
+    if (in) {
+        do {
+            line = g_data_input_stream_read_line (in, NULL, NULL, NULL);
+            if (!line) {
+                break;
+            }
+
+            if (g_str_has_prefix (line, "nameserver ")) {
+                add_resolver (&line[sizeof("nameserver ") - 1]);
+                if (nresolvers >= G_N_ELEMENTS (resolvers)) {
+                    g_free (line);
+                    break;
+                }
+            }
+
+            g_free (line);
+        } while (1);
+
+        g_object_unref (in);
+    }
+
+    g_object_unref (file);
+    g_object_unref (fio);
 }
 
 static
