@@ -31,6 +31,7 @@
 #include <string.h>
 #include <netinet/in.h>
 #include <resolv.h>
+#include <paths.h>
 
 #include <glib.h>
 #include <glib/gstdio.h>
@@ -80,8 +81,8 @@ gint32 nresolvers = 0;
 static gboolean cache = FALSE;
 static gboolean randomize = FALSE;
 static GHashTable *caches[2] = {NULL, NULL};
-static GFile *cfg_file = NULL;
-static GFileMonitor *cfg_monitor = NULL;
+static GFile *cfg_file = NULL, *resolv_conf = NULL;
+static GFileMonitor *cfg_monitor = NULL, *resolv_conf_monitor = NULL;
 
 static
 gboolean
@@ -799,6 +800,10 @@ update_cfg (const gboolean    root)
     cfg_monitor = NULL;
     g_object_unref (cfg_file);
 
+    g_object_unref (resolv_conf_monitor);
+    resolv_conf_monitor = NULL;
+    g_object_unref (resolv_conf);
+
     if (!parse_cfg (root)) {
         return;
     }
@@ -834,54 +839,47 @@ on_cfg_changed (GFileMonitor        *monitor,
 
 static
 void
-watch_cfg (const gchar      *path,
-           const gboolean   root)
+watch_file (const gchar            *path,
+            const gboolean        root,
+            GFile                **file,
+            GFileMonitor         **mon)
 {
-    cfg_file = g_file_new_for_path (path);
+    *file = g_file_new_for_path (path);
 
-    cfg_monitor = g_file_monitor_file (cfg_file,
-                                       G_FILE_MONITOR_NONE,
-                                       NULL,
-                                       NULL);
-    if (cfg_monitor) {
-        g_signal_connect (cfg_monitor,
+    *mon = g_file_monitor_file (*file,
+                                G_FILE_MONITOR_NONE,
+                                NULL,
+                                NULL);
+    if (*mon) {
+        g_signal_connect (*mon,
                           "changed", G_CALLBACK (on_cfg_changed),
                           (gpointer)(gintptr)root);
     } else {
-        g_object_unref (cfg_file);
-        cfg_file = NULL;
+        g_object_unref (*file);
+        *file = NULL;
     }
 }
 
 static
 void
-on_net_changed (GNetworkMonitor        *mon,
-                gboolean             available,
-                gpointer             user_data)
+watch_cfg (const gchar      *path,
+           const gboolean   root)
 {
-    gboolean root = (gboolean)(gintptr)user_data;
-
-    if (available &&
-        (g_network_monitor_get_connectivity (mon) == G_NETWORK_CONNECTIVITY_FULL)) {
-        update_cfg (root);
-    }
+    return watch_file (path,
+                       root,
+                       &cfg_file,
+                       &cfg_monitor);
 }
+
 
 static
 void
-watch_net (const gboolean    root)
+watch_resolv_conf (const gboolean    root)
 {
-    GNetworkMonitor *mon;
-
-    mon = g_network_monitor_get_default ();
-    if (!mon) {
-        return;
-    }
-
-    g_signal_connect (mon,
-                      "network-changed",
-                      G_CALLBACK (on_net_changed),
-                      (gpointer)(gintptr)root);
+    return watch_file (_PATH_RESCONF,
+                       root,
+                       &resolv_conf,
+                       &resolv_conf_monitor);
 }
 
 static
@@ -1016,7 +1014,7 @@ parsed:
     }
 
     watch_cfg (path, root);
-    watch_net (root);
+    watch_resolv_conf (root);
 
     return TRUE;
 }
@@ -1195,6 +1193,11 @@ main (int    argc,
     if (cfg_monitor) {
         g_object_unref (cfg_monitor);
         g_object_unref (cfg_file);
+    }
+
+    if (resolv_conf_monitor) {
+        g_object_unref (resolv_conf_monitor);
+        g_object_unref (resolv_conf);
     }
 
     if (cache) {
