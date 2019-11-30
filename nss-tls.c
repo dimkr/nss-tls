@@ -151,7 +151,8 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
     count = data->res.count;
     if (count == 0) {
         *h_errnop = HOST_NOT_FOUND;
-        goto ok;
+        status = NSS_STATUS_NOTFOUND;
+        goto pop;
     }
     if (count > NSS_TLS_ADDRS_MAX)
         count = NSS_TLS_ADDRS_MAX;
@@ -174,7 +175,6 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
         data->addrs[i] = (char *)&data->res.addrs[i];
     data->addrs[i] = NULL;
 
-ok:
     *errnop = 0;
     status = NSS_STATUS_SUCCESS;
 
