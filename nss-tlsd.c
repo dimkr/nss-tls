@@ -555,23 +555,21 @@ on_body (GObject         *source_object,
         return;
     }
 
-    if (session->response.count > 0) {
-        out = g_io_stream_get_output_stream (G_IO_STREAM (session->connection));
-        g_output_stream_write_all_async (out,
-                                         &session->response,
-                                         sizeof (session->response),
-                                         G_PRIORITY_DEFAULT,
-                                         NULL,
-                                         on_sent,
-                                         session);
+    out = g_io_stream_get_output_stream (G_IO_STREAM (session->connection));
+    g_output_stream_write_all_async (out,
+                                     &session->response,
+                                     sizeof (session->response),
+                                     G_PRIORITY_DEFAULT,
+                                     NULL,
+                                     on_sent,
+                                     session);
 
-        g_debug ("Done resolving %s with %hhu %s result(s)",
-                 session->request.name,
-                 session->response.count,
-                 (session->request.af == AF_INET) ? "IPv4" : "IPv6");
+    g_debug ("Done resolving %s with %hhu %s result(s)",
+             session->request.name,
+             session->response.count,
+             (session->request.af == AF_INET) ? "IPv4" : "IPv6");
 
-        return;
-    }
+    return;
 
 cleanup:
     if (session->response.count == 0) {

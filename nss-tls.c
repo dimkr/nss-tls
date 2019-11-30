@@ -135,9 +135,24 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
     if (total != sizeof(data->res))
         goto pop;
 
+    if (data->res.cname[0]) {
+        ret->h_name = data->res.cname;
+        data->aliases[0] = data->req.name;
+        data->aliases[1] = NULL;
+    } else {
+        ret->h_name = data->req.name;
+        data->aliases[0] = NULL;
+    }
+    ret->h_aliases = data->aliases;
+    ret->h_addrtype = af;
+    data->addrs[0] = NULL;
+    ret->h_addr_list = data->addrs;
+
     count = data->res.count;
-    if (count == 0)
-        return NSS_STATUS_NOTFOUND;
+    if (count == 0) {
+        *h_errnop = HOST_NOT_FOUND;
+        goto ok;
+    }
     if (count > NSS_TLS_ADDRS_MAX)
         count = NSS_TLS_ADDRS_MAX;
 
@@ -159,18 +174,7 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
         data->addrs[i] = (char *)&data->res.addrs[i];
     data->addrs[i] = NULL;
 
-    if (data->res.cname[0]) {
-        ret->h_name = data->res.cname;
-        data->aliases[0] = data->req.name;
-        data->aliases[1] = NULL;
-    } else {
-        ret->h_name = data->req.name;
-        data->aliases[0] = NULL;
-    }
-    ret->h_aliases = data->aliases;
-    ret->h_addrtype = af;
-    ret->h_addr_list = data->addrs;
-
+ok:
     *errnop = 0;
     status = NSS_STATUS_SUCCESS;
 
