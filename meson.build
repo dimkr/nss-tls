@@ -28,8 +28,6 @@ nss_tls_socket_dir = '@0@/run/nss-tls'.format(join_paths(prefix, local_state_dir
 nss_tls_socket_path = '@0@/@1@'.format(nss_tls_socket_dir, nss_tls_socket_name)
 nss_tls_user = get_option('user')
 nss_tls_group = get_option('group')
-nss_tls_user_agent = '@0@/@1@'.format(meson.project_name(),
-                                      meson.project_version())
 nss_tlsd_path = join_paths(get_option('prefix'),
                            get_option('sbindir'),
                            'nss-tlsd')
@@ -40,7 +38,6 @@ add_project_arguments(
     '-DNSS_TLS_SOCKET_DIR="@0@"'.format(nss_tls_socket_dir),
     '-DNSS_TLS_SOCKET_PATH="@0@"'.format(nss_tls_socket_path),
     '-DNSS_TLS_TIMEOUT=@0@'.format(get_option('timeout')),
-    '-DNSS_TLS_USER_AGENT="@0@"'.format(nss_tls_user_agent),
     '-DNSS_TLS_USER="@0@"'.format(nss_tls_user),
     '-DNSS_TLS_GROUP="@0@"'.format(nss_tls_group),
     '-DNSS_TLS_SYSCONFDIR="@0@"'.format(join_paths(prefix, sys_conf_dir)),
