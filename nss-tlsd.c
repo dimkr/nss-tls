@@ -1004,6 +1004,11 @@ parse_cfg (const gboolean   root)
         return FALSE;
     }
 
+    if (!list[0]) {
+        use_dns_servers ();
+        goto parsed;
+    }
+
     for (p = list; *p && (nresolvers < G_N_ELEMENTS (resolvers)); ++p) {
         plus = strchr (*p, '+');
         if (plus) {

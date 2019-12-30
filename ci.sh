@@ -44,7 +44,30 @@ IPV6_ONLY_DOMAINS="
     ipv6.google.com
 "
 
-meson --prefix=/usr --buildtype=release -Dstrip=true -Dresolvers=https://9.9.9.9/dns-query+random,https://dns.google/dns-query+random,https://1.1.1.1/dns-query+random build
+meson --prefix=/usr --buildtype=release -Dstrip=true build
+ninja -C build install
+
+# make sure automatic DNS to DoH upgrade works
+cat << EOF > /etc/resolv.conf
+nameserver 1.1.1.1
+nameserver 9.9.9.9
+EOF
+G_MESSAGES_DEBUG=all ./build/nss-tlsd &
+pid=$?
+sleep 1
+
+# pick 3 random domains
+domains=`echo $DOMAINS | tr ' ' \\\n | shuf | head -n 3`
+
+for d in $domains
+do
+    tlslookup $d
+done
+kill -9 $pid
+
+# make sure explicit choice of DoH servers works
+echo -n > /etc/resolv.conf
+meson configure build -Dresolvers=https://9.9.9.9/dns-query+random,https://dns.google/dns-query+random,https://1.1.1.1/dns-query+random
 ninja -C build install
 
 CC=clang meson --prefix=/usr -Db_sanitize=address build-asan
@@ -57,9 +80,6 @@ sed 's/hosts:.*/hosts: files tls/' -i /etc/nsswitch.conf
 G_MESSAGES_DEBUG=all ./build-asan/nss-tlsd -r | tee /tmp/nss-tlsd.log &
 pid=$!
 sleep 1
-
-# pick 3 random domains
-domains=`echo $DOMAINS | tr ' ' \\\n | shuf | head -n 3`
 
 for i in a b c
 do
