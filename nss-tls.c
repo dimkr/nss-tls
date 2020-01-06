@@ -111,13 +111,14 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
         (setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0))
         goto pop;
 
-    if ((connect(s, (const struct sockaddr *)&sun, sizeof(sun)) < 0) &&
-        (errno != ENOENT))
-        goto pop;
+    if (connect(s, (const struct sockaddr *)&sun, sizeof(sun)) < 0) {
+        if (errno != ENOENT)
+            goto pop;
 
-    strcpy(sun.sun_path, NSS_TLS_SOCKET_PATH);
-    if (connect(s, (const struct sockaddr *)&sun, sizeof(sun)) < 0)
-        goto pop;
+        strcpy(sun.sun_path, NSS_TLS_SOCKET_PATH);
+        if (connect(s, (const struct sockaddr *)&sun, sizeof(sun)) < 0)
+            goto pop;
+    }
 
     data->req.af = af;
     strncpy(data->req.name, name, sizeof(data->req.name));
