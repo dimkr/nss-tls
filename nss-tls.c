@@ -100,8 +100,15 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
 
     if ((setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) < 0) ||
-        (setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) ||
-        (connect(s, (const struct sockaddr *)&sun, sizeof(sun)) < 0))
+        (setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0))
+        goto pop;
+
+    if ((connect(s, (const struct sockaddr *)&sun, sizeof(sun)) < 0) &&
+        (errno != ENOENT))
+        goto pop;
+
+    strcpy(sun.sun_path, NSS_TLS_SOCKET_PATH);
+    if (connect(s, (const struct sockaddr *)&sun, sizeof(sun)) < 0)
         goto pop;
 
     data->req.af = af;
