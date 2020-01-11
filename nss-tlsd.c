@@ -874,7 +874,15 @@ static
 void
 watch_resolv_conf (const gboolean    root)
 {
-    return watch_file (_PATH_RESCONF,
+    g_autofree gchar *rpath = NULL;
+    const gchar *path = _PATH_RESCONF;
+
+    rpath = g_file_read_link (path, NULL);
+    if (rpath) {
+        path = rpath;
+    }
+
+    return watch_file (rpath,
                        root,
                        &resolv_conf,
                        &resolv_conf_monitor);
