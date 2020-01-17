@@ -1,7 +1,7 @@
 /*
  * This file is part of nss-tls.
  *
- * Copyright (C) 2018, 2019  Dima Krasner
+ * Copyright (C) 2018, 2019, 2020  Dima Krasner
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -882,7 +882,7 @@ watch_resolv_conf (const gboolean    root)
         path = rpath;
     }
 
-    return watch_file (rpath,
+    return watch_file (path,
                        root,
                        &resolv_conf,
                        &resolv_conf_monitor);
@@ -1098,6 +1098,7 @@ main (int    argc,
     GSocketService *s;
     GSocketAddress *sa;
     const gchar *runtime_dir;
+    gchar *dir;
     struct passwd *user;
     gchar *user_socket = root_socket;
 #ifdef NSS_TLS_DEBUG
@@ -1168,6 +1169,16 @@ main (int    argc,
                                                g_free,
                                                g_free);
         }
+    }
+
+    /*
+     * /etc/resolv.conf may be a relative symlink and we want to support GLib
+     * versions that don't have g_canonicalize_filename()
+     */
+    dir = g_path_get_dirname (_PATH_RESCONF);
+    if (dir) {
+        chdir (dir);
+        g_free (dir);
     }
 
     g_unlink (user_socket);
