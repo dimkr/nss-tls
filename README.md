@@ -67,7 +67,7 @@ Then compile nss-tls with:
 
 and install in `/usr/sbin` (requires root access)
 
-    ninja -C build install
+    sudo ninja -C build install
 
 ## Configuration
 
