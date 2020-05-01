@@ -4,4 +4,4 @@ services:
   - docker
 
 script:
-  - docker run -e CI -w /root/nss-tls -v `pwd`:/root/nss-tls dimkr/nss-tls:0.x ./ci.sh
+  - docker run --cap-add SYS_PTRACE -e CI -w /root/nss-tls -v `pwd`:/root/nss-tls dimkr/nss-tls:0.x ./ci.sh
