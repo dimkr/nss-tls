@@ -65,24 +65,32 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
     *errnop = ENOENT;
     *h_errnop = NETDB_SUCCESS;
 
-    if (geteuid() == 0)
-        strcpy(sun.sun_path, NSS_TLS_SOCKET_PATH);
-    else {
-        dir = getenv("XDG_RUNTIME_DIR");
-        if (dir) {
-            len = strlen(dir);
-            if (len > sizeof(sun.sun_path) - sizeof("/"NSS_TLS_SOCKET_NAME))
-                return NSS_STATUS_TRYAGAIN;
+    const char *const socketpath = getenv ("NSS_TLS_SOCKET");
 
-            memcpy(sun.sun_path, dir, len);
-            sun.sun_path[len] = '/';
-            ++len;
-            strncpy(sun.sun_path + len,
-                    NSS_TLS_SOCKET_NAME,
-                    sizeof(sun.sun_path) - len);
-            sun.sun_path[sizeof(sun.sun_path) - 1] = '\0';
-        } else
+    if (!socketpath) {
+        if (geteuid() == 0)
             strcpy(sun.sun_path, NSS_TLS_SOCKET_PATH);
+        else {
+            dir = getenv("XDG_RUNTIME_DIR");
+            if (dir) {
+                len = strlen(dir);
+                if (len > sizeof(sun.sun_path) - sizeof("/"NSS_TLS_SOCKET_NAME))
+                    return NSS_STATUS_TRYAGAIN;
+
+                memcpy(sun.sun_path, dir, len);
+                sun.sun_path[len] = '/';
+                ++len;
+                strncpy(sun.sun_path + len,
+                        NSS_TLS_SOCKET_NAME,
+                        sizeof(sun.sun_path) - len);
+                sun.sun_path[sizeof(sun.sun_path) - 1] = '\0';
+             } else
+                strcpy(sun.sun_path, NSS_TLS_SOCKET_PATH);
+        }
+    } else {
+        len = strlen (socketpath);
+        if (len >= sizeof(sun.sun_path)) return EXIT_FAILURE;
+        memcpy (sun.sun_path, socketpath, len + 1);
     }
 
     pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &state);
