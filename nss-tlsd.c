@@ -78,6 +78,7 @@ gint32 nresolvers = 0;
 
 static gboolean cache = FALSE;
 static gboolean randomize = FALSE;
+static gchar *cfgpath;
 static GHashTable *caches[2] = {NULL, NULL};
 static GFile *cfg_file = NULL;
 static GFileMonitor *cfg_monitor = NULL;
@@ -871,12 +872,17 @@ parse_cfg (const gboolean   root)
 
     cfg = g_key_file_new ();
 
-    if (!g_key_file_load_from_dirs (cfg,
-                                    NSS_TLS_CONF_NAME,
-                                    dirs,
-                                    &path,
-                                    G_KEY_FILE_NONE,
-                                    NULL)) {
+    if ((path = cfgpath)
+        ? !g_key_file_load_from_file (cfg,
+                                      path,
+                                      G_KEY_FILE_NONE,
+                                      NULL)
+        : !g_key_file_load_from_dirs (cfg,
+                                      NSS_TLS_CONF_NAME,
+                                      dirs,
+                                      &path,
+                                      G_KEY_FILE_NONE,
+                                      NULL)) {
         return FALSE;
     }
 
@@ -943,7 +949,8 @@ static GOptionEntry opts[] = {
         &randomize,
         "Choose a random server every time",
         NULL
-    }
+    },
+    {"config", 'C', 0, G_OPTION_ARG_FILENAME, &cfgpath, "Path to the configuration file", NULL }
 };
 
 static
