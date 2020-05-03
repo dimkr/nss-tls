@@ -76,6 +76,8 @@ static struct {
 } resolvers[MAX_RESOLVERS];
 gint32 nresolvers = 0;
 
+static gchar *username;
+
 static gboolean cache = FALSE;
 static gboolean randomize = FALSE;
 static GHashTable *caches[2] = {NULL, NULL};
@@ -928,6 +930,14 @@ parse_cfg (const gboolean   root)
         return FALSE;
     }
 
+    if (root) {
+        g_free (username);
+        username = g_key_file_get_value (cfg, "global", "user", NULL);
+        if (!username || !*username) {
+            return FALSE;
+        }
+    }
+
     watch_cfg (path, root);
 
     return TRUE;
@@ -988,8 +998,13 @@ main (int    argc,
     }
 
     root = (geteuid () == 0);
+
+    if (!parse_cfg (root)) {
+        return EXIT_FAILURE;
+    }
+
     if (root) {
-        user = getpwnam (NSS_TLS_USER);
+        user = getpwnam (username);
         if (!user) {
             return EXIT_FAILURE;
         }
@@ -1021,10 +1036,6 @@ main (int    argc,
                                     runtime_dir,
                                     NSS_TLS_SOCKET_NAME,
                                     NULL);
-    }
-
-    if (!parse_cfg (root)) {
-        return EXIT_FAILURE;
     }
 
     if (root && cache) {
