@@ -65,9 +65,9 @@ enum nss_status _nss_tls_gethostbyname2_r(const char *name,
     *errnop = ENOENT;
     *h_errnop = NETDB_SUCCESS;
 
-    const char *const socketpath = getenv ("NSS_TLS_SOCKET");
+    const char *const socketpath = getenv("NSS_TLS_SOCKET");
 
-    if (!socketpath) {
+    if (!socketpath || getuid() != geteuid()) {
         if (geteuid() == 0)
             strcpy(sun.sun_path, NSS_TLS_SOCKET_PATH);
         else {
