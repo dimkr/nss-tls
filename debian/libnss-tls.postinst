@@ -1,0 +1,48 @@
+#!/bin/sh
+
+set -e
+
+# This code was taken from libnss-myhostname
+
+# try to insert tls entries to the "hosts" line in /etc/nsswitch.conf to
+# automatically enable libnss-tls support; do not change the
+# configuration if the "hosts" line already references some tls lookups
+insert_nss_entry() {
+    echo "Checking NSS setup..."
+    # abort if /etc/nsswitch.conf does not exist
+    if ! [ -e /etc/nsswitch.conf ]; then
+        echo "Could not find /etc/nsswitch.conf."
+        return
+    fi
+    echo "Adding 'tls' to nsswitch.conf..."
+    perl -i -pe '
+        sub insert {
+            my $line = shift;
+            # this also splits on tab
+            my @bits=split(" ", $line);
+            # do not break configuration if the "hosts" line already references
+            # tls
+            if (grep { $_ eq "tls"} @bits) {
+                return $line;
+            }
+            if (grep { $_ eq "dns"} @bits) {
+                # add tls before dns
+                $line =~ s/(\s+)dns(\s+)/$1tls dns$2/;
+                return $line;
+            } else {
+                # add tls at the end
+                return $line . " tls";
+            }
+        }
+        s/^(hosts:\s+)(.*)/$1.insert($2)/e;
+    ' /etc/nsswitch.conf
+}
+
+if [ "$1" = configure ] && [ -z "$2" ]; then
+    echo "First installation detected..."
+    # first install: setup the recommended configuration (unless
+    # nsswitch.conf already contains tls entries)
+    insert_nss_entry
+fi
+
+#DEBHELPER#

@@ -1,0 +1,8 @@
+nss-tls for Debian
+-----------------
+
+The nss-tlsd is preconfigured with three DNS-over-HTTPS resolvers. You
+can review and update the resolvers in file `/etc/nss-tls.conf'.
+
+
+ -- Kan-Ru Chen (陳侃如) <koster@debian.org>, Sun, 24 May 2020 08:35:16 +0900

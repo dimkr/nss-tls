@@ -1,0 +1,81 @@
+Source: nss-tls
+Priority: optional
+Maintainer: Kan-Ru Chen (陳侃如) <koster@debian.org>
+Build-Depends: debhelper-compat (= 12), libglib2.0-dev (>= 2.44),
+ libsoup2.4-dev, ninja-build, python3-pip, meson
+Standards-Version: 4.5.0
+Section: net
+Rules-Requires-Root: no
+Homepage: https://github.com/dimkr/nss-tls
+#Vcs-Browser: https://salsa.debian.org/debian/nss-tls
+#Vcs-Git: https://salsa.debian.org/debian/nss-tls.git
+
+Package: nss-tlsd
+Architecture: any
+Multi-Arch: foreign
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: encrypted DNS name resolution daemon
+ nss-tls is an alternative, encrypted name resolving library to use
+ with glibc, which uses DNS-over-HTTPS (DoH).
+ .
+ The glibc name resolver can be configured through nsswitch.conf(5) to
+ use nss-tls instead of the DNS resolver, or fall back to DNS when
+ nss-tls fails.
+ .
+ This way, all applications that use the standard resolver API
+ (getaddrinfo(), gethostbyname(), etc'), are transparently migrated
+ from DNS to encrypted means of name resolving, with zero
+ application-side changes and minimal resource consumption footprint.
+ However, nss-tls does not deal with applications that use their own,
+ built-in DNS resolver.
+ .
+ This package contains the daemon to be used in conjunction with the
+ libnss-tls NSS module. The daemon runs in the background, receives
+ name resolving requests over a Unix socket and replies with resolved
+ addresses.
+
+Package: libnss-tls
+Architecture: any
+Multi-Arch: same
+Depends: nss-tlsd (>=${source:Upstream-Version}), ${shlibs:Depends}, ${misc:Depends}
+Description: NSS module for encrypted DNS name resolution
+ nss-tls is an alternative, encrypted name resolving library to use
+ with glibc, which uses DNS-over-HTTPS (DoH).
+ .
+ The glibc name resolver can be configured through nsswitch.conf(5) to
+ use nss-tls instead of the DNS resolver, or fall back to DNS when
+ nss-tls fails.
+ .
+ This way, all applications that use the standard resolver API
+ (getaddrinfo(), gethostbyname(), etc'), are transparently migrated
+ from DNS to encrypted means of name resolving, with zero
+ application-side changes and minimal resource consumption footprint.
+ However, nss-tls does not deal with applications that use their own,
+ built-in DNS resolver.
+ .
+ This package contains the NSS module, a tiny client library, which
+ delegates the resolving work to nss-tlsd through the Unix socket and
+ passes the results back to the application, without dependencies
+ other than libc.
+
+Package: tlslookup
+Section: utils
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: utility like nslookup(1), but uses libnss_tls.so instead of DNS
+ nss-tls is an alternative, encrypted name resolving library to use
+ with glibc, which uses DNS-over-HTTPS (DoH).
+ .
+ The glibc name resolver can be configured through nsswitch.conf(5) to
+ use nss-tls instead of the DNS resolver, or fall back to DNS when
+ nss-tls fails.
+ .
+ This way, all applications that use the standard resolver API
+ (getaddrinfo(), gethostbyname(), etc'), are transparently migrated
+ from DNS to encrypted means of name resolving, with zero
+ application-side changes and minimal resource consumption footprint.
+ However, nss-tls does not deal with applications that use their own,
+ built-in DNS resolver.
+ .
+ This package contains the utility program to lookup DNS names using
+ libnss-tls.

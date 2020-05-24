@@ -1,0 +1,5 @@
+nss-tls (0~git20200523-1) unstable; urgency=medium
+
+  * Initial release (Closes: #958710)
+
+ -- Kan-Ru Chen (陳侃如) <koster@debian.org>  Sat, 23 May 2020 22:01:40 +0900

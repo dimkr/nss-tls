@@ -1,0 +1,30 @@
+#!/bin/sh
+
+set -e
+
+remove_nss_entry() {
+    local file=$1
+    local pkg=$2
+    local module=$3
+    refcount=$(dpkg-query -f '${db:Status-Abbrev} ${binary:Package}\n' \
+        -W $pkg | grep '^i' | wc -l)
+    if [ "$refcount" -gt 0 ] ; then
+        # package is installed for other architectures still, do nothing
+        return
+    fi
+    echo "Checking NSS setup..."
+    # abort if file does not exist
+    if ! [ -e $file ]; then
+        echo "Could not find ${file}."
+        return
+    fi
+    # we must remove possible [foo=bar] options as well
+    echo "Removing 'tls' from nsswitch.conf..."
+    sed -i -r "/hosts:/ s/[[:space:]]+$module\b([[:space:]]*\[[^]]*\])*//" $file
+}
+
+if [ "$1" = remove ]; then
+    remove_nss_entry /etc/nsswitch.conf libnss-tls tls
+fi
+
+#DEBHELPER#
