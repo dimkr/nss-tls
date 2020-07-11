@@ -13,7 +13,7 @@
 # package maintainers to append LDFLAGS
 #export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
 
-DEFAULT_RESOLVERS=https://9.9.9.9/dns-query,https://dns.google/dns-query,https://1.1.1.1/dns-query
+DEFAULT_RESOLVERS=https://9.9.9.9/dns-query,https://dns.google/dns-query+get,https://1.1.1.1/dns-query
 
 %:
 	dh $@
