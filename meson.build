@@ -98,3 +98,4 @@ if systemd.found()
 endif
 
 install_man('nss-tlsd.8')
+install_man('tlslookup.1')

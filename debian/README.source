@@ -1,0 +1,11 @@
+nss-tls for Debian
+-----------------
+
+Since the upstream does not have tarball release yet, the source
+tarball is generated with command:
+
+  git archive --prefix nss-tls/ --format tar HEAD | xz > ../nss-tls_0~git`%Y%m%d`.orig.tar.xz
+
+
+ -- Kan-Ru Chen (陳侃如) <koster@debian.org>, Sun, 24 May 2020 08:26:57 +0900
+
