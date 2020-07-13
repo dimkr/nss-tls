@@ -1,3 +1,9 @@
+nss-tls (0~git20200523-2) unstable; urgency=medium
+
+  * Correctly list license as LGPL-2.1+ in debian/copyright
+
+ -- Kan-Ru Chen (陳侃如) <koster@debian.org>  Mon, 13 Jul 2020 11:23:56 +0900
+
 nss-tls (0~git20200523-1) unstable; urgency=medium
 
   * Initial release (Closes: #958710)
