@@ -1,3 +1,15 @@
+nss-tls (1.0-1) unstable; urgency=medium
+
+  [ Dima Krasner ]
+  * debian: remove 0001-Add-simple-manpage-for-tlslookup.patch, upstreamed
+  * debian: 8.8.8.8 wants dns.google in Host:
+  * debian: 8.8.8.8 documentation recommends GET
+
+  [ Kan-Ru Chen ]
+  * New upstream version 1.0
+
+ -- Kan-Ru Chen (陳侃如) <koster@debian.org>  Wed, 15 Jul 2020 22:45:18 +0900
+
 nss-tls (0~git20200523-2) unstable; urgency=medium
 
   * Correctly list license as LGPL-2.1+ in debian/copyright
