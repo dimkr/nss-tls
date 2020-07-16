@@ -123,7 +123,7 @@ sleep 1
 [ -n "`grep '^< HTTP/' /tmp/nss-tlsd.log | grep -v 200`" ] && exit 1
 
 # make sure configuration reloading works
-sed -i /etc/nss-tls.conf s/^resolvers=.*/resolvers=/
+sed -i s/^resolvers=.*/resolvers=/ /etc/nss-tls.conf
 
 # if resolving fails, we should try the next NSS module
 echo "nameserver 185.228.168.168" > /etc/resolv.conf
