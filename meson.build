@@ -28,7 +28,6 @@ nss_tls_socket_dir = '@0@/run/nss-tls'.format(join_paths(prefix, local_state_dir
 nss_tls_socket_path = '@0@/@1@'.format(nss_tls_socket_dir, nss_tls_socket_name)
 nss_tls_user = get_option('user')
 nss_tls_group = get_option('group')
-nss_tls_resconf = get_option('resconf')
 nss_tlsd_path = join_paths(get_option('prefix'),
                            get_option('sbindir'),
                            'nss-tlsd')
@@ -48,13 +47,6 @@ add_project_arguments(
 systemd = dependency('systemd', required: false)
 if systemd.found()
     add_project_arguments('-DNSS_TLS_SYSTEMD', language: 'c')
-endif
-
-if nss_tls_resconf != ''
-    add_project_arguments(
-        '-DNSS_TLS_RESCONF="@0@"'.format(nss_tls_resconf),
-        language: 'c'
-    )
 endif
 
 if get_option('buildtype').startswith('debug')
