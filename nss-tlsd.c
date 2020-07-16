@@ -1055,10 +1055,12 @@ parsed:
         g_warning ("Disabling deterministic server choice may harm privacy");
     }
 
-    g_value_init (&val, G_TYPE_INT);
-    g_value_set_int (&val, MAX_CONNS_PER_RESOLVER * nresolvers);
+    if (nresolvers > 0) {
+        g_value_init (&val, G_TYPE_INT);
+        g_value_set_int (&val, MAX_CONNS_PER_RESOLVER * nresolvers);
 
-    g_object_set_property (G_OBJECT (soup), SOUP_SESSION_MAX_CONNS, &val);
+        g_object_set_property (G_OBJECT (soup), SOUP_SESSION_MAX_CONNS, &val);
+    }
 
     watch_cfg (path, root);
     watch_resolv_conf (root);
