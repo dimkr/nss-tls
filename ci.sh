@@ -48,6 +48,7 @@ meson --prefix=/usr --buildtype=release -Dstrip=true build
 ninja -C build install
 
 # make sure automatic DNS to DoH upgrade works
+echo > /etc/resolv.conf
 ./build/nss-tlsd &
 pid=$!
 sleep 1
@@ -73,7 +74,7 @@ kill -9 $pid
 sleep 1
 
 # make sure monitoring of resolv.conf changes works when resolv.conf is a link
-echo > /etc/resolv.conf
+echo > /tmp/resolv.conf
 rm -f /etc/resolv.conf
 ln -s ../tmp/resolv.conf /etc/resolv.conf
 ./build/nss-tlsd &
