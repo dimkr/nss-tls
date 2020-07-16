@@ -963,7 +963,8 @@ parse_cfg (const gboolean   root)
     GValue val = G_VALUE_INIT;
     const gchar *dirs[3] = {NULL, NULL, NULL};
     g_autofree gchar *user_dir = NULL;
-    gchar **list, **p, *path;
+    gchar **list, **p;
+    g_autofree gchar *path = NULL;
     char *plus;
     g_autoptr(GKeyFile) cfg = NULL;
     g_autoptr(GError) err = NULL;
@@ -1062,7 +1063,9 @@ parsed:
         g_object_set_property (G_OBJECT (soup), SOUP_SESSION_MAX_CONNS, &val);
     }
 
-    watch_cfg (path, root);
+    if (path) {
+        watch_cfg (path, root);
+    }
     watch_resolv_conf (root);
 }
 
