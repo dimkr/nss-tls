@@ -129,6 +129,12 @@ getent hosts google.com && exit 1
 sed 's/hosts:.*/hosts: tls dns/' -i /etc/nsswitch.conf
 getent hosts google.com
 
+# if we have zero DoH servers, we should try the next NSS module
+echo > /etc/resolv.conf
+sleep 1
+tlslookup google.com && exit 1
+getent hosts google.com
+
 kill $pid
 sleep 1
 
