@@ -996,7 +996,12 @@ parse_cfg (const gboolean   root)
                                     dirs,
                                     &path,
                                     G_KEY_FILE_NONE,
-                                    NULL)) {
+                                    &err)) {
+        if (g_error_matches (err,
+                             G_KEY_FILE_ERROR,
+                             G_KEY_FILE_ERROR_NOT_FOUND)) {
+            use_dns_servers ();
+        }
         goto parsed;
     }
 
