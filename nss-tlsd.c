@@ -272,6 +272,10 @@ resolve_domain (struct nss_tls_session *session)
         return TRUE;
     }
 
+    if (nresolvers == 0) {
+        return FALSE;
+    }
+
     switch (session->request.af) {
     case AF_INET:
         type = ns_t_a;
