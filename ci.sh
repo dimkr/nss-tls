@@ -143,6 +143,7 @@ sleep 1
 ./build/nss-tlsd &
 pid=$!
 sleep 1
+echo "nameserver 9.9.9.9" > /etc/resolv.conf
 tlslookup google.com && exit 1
 getent hosts google.com
 
