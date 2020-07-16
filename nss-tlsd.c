@@ -1,7 +1,7 @@
 /*
  * This file is part of nss-tls.
  *
- * Copyright (C) 2018, 2019  Dima Krasner
+ * Copyright (C) 2018, 2019, 2020  Dima Krasner
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -31,6 +31,7 @@
 #include <string.h>
 #include <netinet/in.h>
 #include <resolv.h>
+#include <paths.h>
 
 #include <glib.h>
 #include <glib/gstdio.h>
@@ -70,6 +71,7 @@ struct nss_tls_session {
 
 static SoupSession *soup = NULL;
 static struct {
+    SoupURI *uri;
     gchar *url;
     const gchar *domain;
     enum nss_tls_methods method;
@@ -79,8 +81,8 @@ gint32 nresolvers = 0;
 static gboolean cache = FALSE;
 static gboolean randomize = FALSE;
 static GHashTable *caches[2] = {NULL, NULL};
-static GFile *cfg_file = NULL;
-static GFileMonitor *cfg_monitor = NULL;
+static GFile *cfg_file = NULL, *resolv_conf = NULL;
+static GFileMonitor *cfg_monitor = NULL, *resolv_conf_monitor = NULL;
 
 static
 gboolean
@@ -788,29 +790,24 @@ parse_cfg (const gboolean   root);
 
 static
 void
-on_cfg_changed (GFileMonitor        *monitor,
-                GFile                *file,
-                GFile                *other_file,
-                GFileMonitorEvent    event_type,
-                gpointer            user_data)
+update_cfg (const gboolean    root)
 {
-    gboolean root = (gboolean)(gintptr)user_data;
     gint pnresolvers = nresolvers, i;
-
-    if ((event_type != G_FILE_MONITOR_EVENT_CHANGES_DONE_HINT) &&
-        (event_type != G_FILE_MONITOR_EVENT_DELETED)) {
-        return;
-    }
 
     g_object_unref (cfg_monitor);
     cfg_monitor = NULL;
     g_object_unref (cfg_file);
+
+    g_object_unref (resolv_conf_monitor);
+    resolv_conf_monitor = NULL;
+    g_object_unref (resolv_conf);
 
     if (!parse_cfg (root)) {
         return;
     }
 
     for (i = 0; i < pnresolvers; ++i) {
+        soup_uri_free (resolvers[i].uri);
         g_free (resolvers[i].url);
     }
 
@@ -822,23 +819,139 @@ on_cfg_changed (GFileMonitor        *monitor,
 
 static
 void
-watch_cfg (const gchar      *path,
-           const gboolean   root)
+on_cfg_changed (GFileMonitor        *monitor,
+                GFile                *file,
+                GFile                *other_file,
+                GFileMonitorEvent    event_type,
+                gpointer             user_data)
 {
-    cfg_file = g_file_new_for_path (path);
+    gboolean root = (gboolean)(gintptr)user_data;
 
-    cfg_monitor = g_file_monitor_file (cfg_file,
-                                       G_FILE_MONITOR_NONE,
-                                       NULL,
-                                       NULL);
-    if (cfg_monitor) {
-        g_signal_connect (cfg_monitor,
+    if ((event_type != G_FILE_MONITOR_EVENT_CHANGES_DONE_HINT) &&
+        (event_type != G_FILE_MONITOR_EVENT_DELETED)) {
+        return;
+    }
+
+    update_cfg (root);
+}
+
+static
+void
+watch_file (const gchar            *path,
+            const gboolean        root,
+            GFile                **file,
+            GFileMonitor         **mon)
+{
+    *file = g_file_new_for_path (path);
+
+    *mon = g_file_monitor_file (*file,
+                                G_FILE_MONITOR_NONE,
+                                NULL,
+                                NULL);
+    if (*mon) {
+        g_signal_connect (*mon,
                           "changed", G_CALLBACK (on_cfg_changed),
                           (gpointer)(gintptr)root);
     } else {
-        g_object_unref (cfg_file);
-        cfg_file = NULL;
+        g_object_unref (*file);
+        *file = NULL;
     }
+}
+
+static
+void
+watch_cfg (const gchar      *path,
+           const gboolean   root)
+{
+    return watch_file (path,
+                       root,
+                       &cfg_file,
+                       &cfg_monitor);
+}
+
+
+static
+void
+watch_resolv_conf (const gboolean    root)
+{
+    g_autofree gchar *rpath = NULL;
+    const gchar *path = _PATH_RESCONF;
+
+    rpath = g_file_read_link (path, NULL);
+    if (rpath) {
+        path = rpath;
+    }
+
+    return watch_file (path,
+                       root,
+                       &resolv_conf,
+                       &resolv_conf_monitor);
+}
+
+static
+void
+add_resolver (const char    *addr)
+{
+    if (strchr (addr, ':')) {
+        resolvers[nresolvers].url = g_strconcat ("https://[", addr, "]/dns-query", NULL);
+    } else {
+        resolvers[nresolvers].url = g_strconcat ("https://", addr, "/dns-query", NULL);
+    }
+    resolvers[nresolvers].uri = soup_uri_new (resolvers[nresolvers].url);
+    resolvers[nresolvers].domain = soup_uri_get_host (resolvers[nresolvers].uri);
+    resolvers[nresolvers].method = NSS_TLS_METHOD_POST;
+
+    ++nresolvers;
+}
+
+static
+void
+use_dns_servers (void)
+{
+    GFile *file;
+    GFileInputStream *fio;
+    GDataInputStream *in;
+    char *line;
+
+    if (nresolvers >= G_N_ELEMENTS (resolvers)) {
+        return;
+    }
+
+    file = g_file_new_for_path (_PATH_RESCONF);
+    if (!file) {
+        return;
+    }
+
+    fio = g_file_read (file, NULL, NULL);
+    if (!fio) {
+        g_object_unref (file);
+        return;
+    }
+
+    in = g_data_input_stream_new (G_INPUT_STREAM (fio));
+    if (in) {
+        do {
+            line = g_data_input_stream_read_line (in, NULL, NULL, NULL);
+            if (!line) {
+                break;
+            }
+
+            if (g_str_has_prefix (line, "nameserver ")) {
+                add_resolver (&line[sizeof("nameserver ") - 1]);
+                if (nresolvers >= G_N_ELEMENTS (resolvers)) {
+                    g_free (line);
+                    break;
+                }
+            }
+
+            g_free (line);
+        } while (1);
+
+        g_object_unref (in);
+    }
+
+    g_object_unref (file);
+    g_object_unref (fio);
 }
 
 static
@@ -850,7 +963,7 @@ parse_cfg (const gboolean   root)
     gchar **list, **p, *path;
     char *plus;
     g_autoptr(GKeyFile) cfg = NULL;
-    SoupURI *uri;
+    g_autoptr(GError) err = NULL;
 
     if (root) {
         dirs[0] = NSS_TLS_SYSCONFDIR;
@@ -886,9 +999,20 @@ parse_cfg (const gboolean   root)
                                        "global",
                                        "resolvers",
                                        NULL,
-                                       NULL);
+                                       &err);
     if (!list) {
+        if (g_error_matches (err,
+                             G_KEY_FILE_ERROR,
+                             G_KEY_FILE_ERROR_KEY_NOT_FOUND)) {
+            use_dns_servers ();
+            goto parsed;
+        }
         return FALSE;
+    }
+
+    if (!list[0]) {
+        use_dns_servers ();
+        goto parsed;
     }
 
     for (p = list; *p && (nresolvers < G_N_ELEMENTS (resolvers)); ++p) {
@@ -898,15 +1022,15 @@ parse_cfg (const gboolean   root)
             ++plus;
         }
 
-        uri = soup_uri_new (*p);
-        if (!uri) {
+        resolvers[nresolvers].uri = soup_uri_new (*p);
+        if (!resolvers[nresolvers].uri) {
             g_warning ("Bad resolver: %s", *p);
             g_free (*p);
             continue;
         }
 
         resolvers[nresolvers].url = *p;
-        resolvers[nresolvers].domain = soup_uri_get_host (uri);
+        resolvers[nresolvers].domain = soup_uri_get_host (resolvers[nresolvers].uri);
         resolvers[nresolvers].method = NSS_TLS_METHOD_POST;
 
         if (plus) {
@@ -924,11 +1048,13 @@ parse_cfg (const gboolean   root)
 
     g_free (list);
 
+parsed:
     if (nresolvers == 0) {
         return FALSE;
     }
 
     watch_cfg (path, root);
+    watch_resolv_conf (root);
 
     return TRUE;
 }
@@ -972,6 +1098,7 @@ main (int    argc,
     GSocketService *s;
     GSocketAddress *sa;
     const gchar *runtime_dir;
+    gchar *dir;
     struct passwd *user;
     gchar *user_socket = root_socket;
 #ifdef NSS_TLS_DEBUG
@@ -1044,6 +1171,16 @@ main (int    argc,
         }
     }
 
+    /*
+     * /etc/resolv.conf may be a relative symlink and we want to support GLib
+     * versions that don't have g_canonicalize_filename()
+     */
+    dir = g_path_get_dirname (_PATH_RESCONF);
+    if (dir) {
+        chdir (dir);
+        g_free (dir);
+    }
+
     g_unlink (user_socket);
     sa = g_unix_socket_address_new (user_socket);
     s = g_socket_service_new ();
@@ -1090,6 +1227,7 @@ main (int    argc,
     g_main_loop_run (loop);
 
     for (i = 0; i < nresolvers; ++i) {
+        soup_uri_free (resolvers[i].uri);
         g_free (resolvers[i].url);
     }
 
@@ -1104,6 +1242,11 @@ main (int    argc,
     if (cfg_monitor) {
         g_object_unref (cfg_monitor);
         g_object_unref (cfg_file);
+    }
+
+    if (resolv_conf_monitor) {
+        g_object_unref (resolv_conf_monitor);
+        g_object_unref (resolv_conf);
     }
 
     if (cache) {
