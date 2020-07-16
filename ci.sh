@@ -52,7 +52,7 @@ cat << EOF > /etc/resolv.conf
 nameserver 1.1.1.1
 nameserver 9.9.9.9
 EOF
-G_MESSAGES_DEBUG=all ./build/nss-tlsd &
+./build/nss-tlsd &
 pid=$?
 sleep 1
 
@@ -77,7 +77,7 @@ ldconfig
 echo "8.8.8.8 dns.google" >> /etc/hosts
 cp -f /etc/nsswitch.conf /tmp/
 sed 's/hosts:.*/hosts: files tls/' -i /etc/nsswitch.conf
-G_MESSAGES_DEBUG=all ./build-asan/nss-tlsd -r | tee /tmp/nss-tlsd.log &
+./build-asan/nss-tlsd -r | tee /tmp/nss-tlsd.log &
 pid=$!
 sleep 1
 
