@@ -2,7 +2,7 @@
 
 # This file is part of nss-tls.
 #
-# Copyright (C) 2018, 2019  Dima Krasner
+# Copyright (C) 2018, 2019, 2020  Dima Krasner
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -100,6 +100,7 @@ tlslookup dns.google && exit 1
 # resolving domains suffixed by the local domain should fail too and change of
 # the local domain should take effect immediately
 echo "search ci" >> /etc/resolv.conf
+sleep 1
 tlslookup google.com.ci && exit 1
 
 # before 9169a0, the canonical name was an alias (instead of being the name,
@@ -120,5 +121,12 @@ sleep 1
 # before 963b0b, 8.8.8.8 responded with 400 if the dns= parameter contained URL
 # unsafe characters
 [ -n "`grep '^< HTTP/' /tmp/nss-tlsd.log | grep -v 200`" ] && exit 1
+
+# if resolving fails, we sould try the next NSS module
+echo "nameserver 185.228.168.168" > /etc/resolv.conf
+sleep 1
+getent hosts google.com && exit 1
+sed 's/hosts:.*/hosts: tls dns/' -i /etc/nsswitch.conf
+getent hosts google.com
 
 exit 0
