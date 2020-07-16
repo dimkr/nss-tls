@@ -45,7 +45,7 @@ nss-tls depends on:
 * [GLib](https://wiki.gnome.org/Projects/GLib)
 * [libsoup](https://wiki.gnome.org/Projects/libsoup)
 
-If [systemd](https://www.freedesktop.org/wiki/Software/systemd/) is present, the installation of nss-tls includes unit files for nss-tlsd.
+If [systemd](https://www.freedesktop.org/wiki/Software/systemd/) is present, the installation of nss-tls includes unit files for nss-tlsd, and nss-tlsd may co-exist with [systemd-resolved](https://www.freedesktop.org/software/systemd/man/systemd-resolved.service.html).
 
 However, nss-tls does not depend on [systemd](https://www.freedesktop.org/wiki/Software/systemd/). When [systemd](https://www.freedesktop.org/wiki/Software/systemd/) is not present, other means of running a nss-tlsd instance for each user (e.g. xinitrc) and root (e.g. an init script) should be used.
 
