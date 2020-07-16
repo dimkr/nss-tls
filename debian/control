@@ -2,7 +2,7 @@ Source: nss-tls
 Priority: optional
 Maintainer: Kan-Ru Chen (陳侃如) <koster@debian.org>
 Build-Depends: debhelper-compat (= 12), libglib2.0-dev (>= 2.44),
- libsoup2.4-dev, ninja-build, python3-pip, meson
+ libsoup2.4-dev, systemd, ninja-build, python3-pip, meson
 Standards-Version: 4.5.0
 Section: net
 Rules-Requires-Root: no
