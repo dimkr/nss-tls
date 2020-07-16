@@ -1,6 +1,6 @@
 # This file is part of nss-tls.
 #
-# Copyright (C) 2018, 2019  Dima Krasner
+# Copyright (C) 2018, 2019, 2020  Dima Krasner
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -28,6 +28,7 @@ nss_tls_socket_dir = '@0@/run/nss-tls'.format(join_paths(prefix, local_state_dir
 nss_tls_socket_path = '@0@/@1@'.format(nss_tls_socket_dir, nss_tls_socket_name)
 nss_tls_user = get_option('user')
 nss_tls_group = get_option('group')
+nss_tls_resconf = get_option('resconf')
 nss_tlsd_path = join_paths(get_option('prefix'),
                            get_option('sbindir'),
                            'nss-tlsd')
@@ -43,6 +44,13 @@ add_project_arguments(
     '-DNSS_TLS_SYSCONFDIR="@0@"'.format(join_paths(prefix, sys_conf_dir)),
     language: 'c'
 )
+
+if nss_tls_resconf != ''
+    add_project_arguments(
+        '-DNSS_TLS_RESCONF="@0@"'.format(nss_tls_resconf),
+        language: 'c'
+    )
+endif
 
 if get_option('buildtype').startswith('debug')
     add_project_arguments('-DNSS_TLS_DEBUG', language: 'c')

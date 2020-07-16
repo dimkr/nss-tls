@@ -31,7 +31,10 @@
 #include <string.h>
 #include <netinet/in.h>
 #include <resolv.h>
-#include <paths.h>
+#ifndef NSS_TLS_RESCONF
+#    include <paths.h>
+#    define NSS_TLS_RESCONF _PATH_RESCONF
+#endif
 
 #include <glib.h>
 #include <glib/gstdio.h>
@@ -877,7 +880,7 @@ void
 watch_resolv_conf (const gboolean    root)
 {
     g_autofree gchar *rpath = NULL;
-    const gchar *path = _PATH_RESCONF;
+    const gchar *path = NSS_TLS_RESCONF;
 
     rpath = g_file_read_link (path, NULL);
     if (rpath) {
@@ -919,7 +922,7 @@ use_dns_servers (void)
         return;
     }
 
-    file = g_file_new_for_path (_PATH_RESCONF);
+    file = g_file_new_for_path (NSS_TLS_RESCONF);
     if (!file) {
         return;
     }
@@ -1177,7 +1180,7 @@ main (int    argc,
      * /etc/resolv.conf may be a relative symlink and we want to support GLib
      * versions that don't have g_canonicalize_filename()
      */
-    dir = g_path_get_dirname (_PATH_RESCONF);
+    dir = g_path_get_dirname (NSS_TLS_RESCONF);
     if (dir) {
         chdir (dir);
         g_free (dir);
