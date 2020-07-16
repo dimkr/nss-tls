@@ -45,6 +45,11 @@ add_project_arguments(
     language: 'c'
 )
 
+systemd = dependency('systemd', required: false)
+if systemd.found()
+    add_project_arguments('-DNSS_TLS_SYSTEMD', language: 'c')
+endif
+
 if nss_tls_resconf != ''
     add_project_arguments(
         '-DNSS_TLS_RESCONF="@0@"'.format(nss_tls_resconf),
@@ -88,7 +93,6 @@ nss_tls_conf = configure_file(input: 'nss-tls.conf.in',
                               configuration: cfg)
 install_data(nss_tls_conf, install_dir: sys_conf_dir)
 
-systemd = dependency('systemd', required: false)
 if systemd.found()
     nss_tlsd_service = configure_file(input: 'nss-tlsd.service.in',
                                       output: 'nss-tlsd.service',

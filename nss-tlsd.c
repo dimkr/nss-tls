@@ -874,19 +874,11 @@ watch_cfg (const gchar      *path,
                        &cfg_monitor);
 }
 
-
 static
 void
-watch_resolv_conf (const gboolean    root)
+watch_resolv_conf (const gchar      *path,
+                   const gboolean   root)
 {
-    g_autofree gchar *rpath = NULL;
-    const gchar *path = NSS_TLS_RESCONF;
-
-    rpath = g_file_read_link (path, NULL);
-    if (rpath) {
-        path = rpath;
-    }
-
     return watch_file (path,
                        root,
                        &resolv_conf,
@@ -910,19 +902,55 @@ add_resolver (const char    *addr)
 }
 
 static
+gchar *
+find_resolv_conf (void)
+{
+    g_autofree gchar *rpath = NULL;
+#ifdef NSS_TLS_SYSTEMD
+    g_autofree gchar *base = NULL, *dir = NULL;
+#endif
+    gchar *tmp;
+
+    rpath = g_file_read_link (NSS_TLS_RESCONF, NULL);
+    if (!rpath) {
+        return NSS_TLS_RESCONF;
+    }
+
+#ifdef NSS_TLS_SYSTEMD
+    /*
+     * hack for systems with systemd: systemd-resolved hijacks
+     * /etc/resolv.conf by replacing it with a symlink to
+     * /run/systemd/resolve/stub-resolv.conf and the actual DNS servers
+     * are specified in /run/systemd/resolve/resolv.conf
+     */
+    base = g_path_get_basename (rpath);
+    if (strcmp (base, "stub-resolv.conf") == 0) {
+        dir = g_path_get_dirname (rpath);
+        return g_build_path ("/", dir, "resolv.conf", NULL);
+    }
+#endif
+
+    tmp = rpath;
+    rpath = NULL;
+    return tmp;
+}
+
+static
 void
-use_dns_servers (void)
+use_dns_servers (const gchar    *path)
 {
     GFile *file;
     GFileInputStream *fio;
     GDataInputStream *in;
     char *line;
 
+    g_debug ("Parsing %s", path);
+
     if (nresolvers >= G_N_ELEMENTS (resolvers)) {
         return;
     }
 
-    file = g_file_new_for_path (NSS_TLS_RESCONF);
+    file = g_file_new_for_path (path);
     if (!file) {
         return;
     }
@@ -967,7 +995,7 @@ parse_cfg (const gboolean   root)
     const gchar *dirs[3] = {NULL, NULL, NULL};
     g_autofree gchar *user_dir = NULL;
     gchar **list, **p;
-    g_autofree gchar *path = NULL;
+    g_autofree gchar *path = NULL, *resconf = NULL;
     char *plus;
     g_autoptr(GKeyFile) cfg = NULL;
     g_autoptr(GError) err = NULL;
@@ -1000,7 +1028,8 @@ parse_cfg (const gboolean   root)
         if (g_error_matches (err,
                              G_KEY_FILE_ERROR,
                              G_KEY_FILE_ERROR_NOT_FOUND)) {
-            use_dns_servers ();
+            resconf = find_resolv_conf ();
+            use_dns_servers (resconf);
         }
         goto parsed;
     }
@@ -1016,13 +1045,15 @@ parse_cfg (const gboolean   root)
         if (g_error_matches (err,
                              G_KEY_FILE_ERROR,
                              G_KEY_FILE_ERROR_KEY_NOT_FOUND)) {
-            use_dns_servers ();
+            resconf = find_resolv_conf ();
+            use_dns_servers (resconf);
         }
         goto parsed;
     }
 
     if (!list[0]) {
-        use_dns_servers ();
+        resconf = find_resolv_conf ();
+        use_dns_servers (resconf);
         goto parsed;
     }
 
@@ -1074,7 +1105,10 @@ parsed:
     if (path) {
         watch_cfg (path, root);
     }
-    watch_resolv_conf (root);
+
+    if (resconf) {
+        watch_resolv_conf (resconf, root);
+    }
 }
 
 static GOptionEntry opts[] = {
