@@ -76,7 +76,7 @@ static struct {
     const gchar *domain;
     enum nss_tls_methods method;
 } resolvers[MAX_RESOLVERS];
-gint32 nresolvers = 0;
+static gint32 nresolvers = 0;
 
 static gboolean cache = FALSE;
 static gboolean randomize = FALSE;
@@ -789,7 +789,7 @@ on_term (gpointer user_data)
 }
 
 static
-gboolean
+void
 parse_cfg (const gboolean   root);
 
 static
@@ -806,9 +806,7 @@ update_cfg (const gboolean    root)
     resolv_conf_monitor = NULL;
     g_object_unref (resolv_conf);
 
-    if (!parse_cfg (root)) {
-        return;
-    }
+    parse_cfg (root);
 
     for (i = 0; i < pnresolvers; ++i) {
         soup_uri_free (resolvers[i].uri);
@@ -959,7 +957,7 @@ use_dns_servers (void)
 }
 
 static
-gboolean
+void
 parse_cfg (const gboolean   root)
 {
     const gchar *dirs[3] = {NULL, NULL, NULL};
@@ -994,7 +992,7 @@ parse_cfg (const gboolean   root)
                                     &path,
                                     G_KEY_FILE_NONE,
                                     NULL)) {
-        return FALSE;
+        goto parsed;
     }
 
     g_key_file_set_list_separator (cfg, ',');
@@ -1009,9 +1007,8 @@ parse_cfg (const gboolean   root)
                              G_KEY_FILE_ERROR,
                              G_KEY_FILE_ERROR_KEY_NOT_FOUND)) {
             use_dns_servers ();
-            goto parsed;
         }
-        return FALSE;
+        goto parsed;
     }
 
     if (!list[0]) {
@@ -1053,14 +1050,8 @@ parse_cfg (const gboolean   root)
     g_free (list);
 
 parsed:
-    if (nresolvers == 0) {
-        return FALSE;
-    }
-
     watch_cfg (path, root);
     watch_resolv_conf (root);
-
-    return TRUE;
 }
 
 static GOptionEntry opts[] = {
@@ -1154,9 +1145,7 @@ main (int    argc,
                                     NULL);
     }
 
-    if (!parse_cfg (root)) {
-        return EXIT_FAILURE;
-    }
+    parse_cfg (root);
 
     if (root && cache) {
         g_warning ("Enabling cache when running as root may harm privacy");
