@@ -115,9 +115,6 @@ done
 [ -f firefox/firefox ] || wget -O- "https://download.mozilla.org/?product=firefox-nightly-latest-ssl&os=linux64&lang=en-US" | tar -xjf-
 ./ci.py firefox/firefox $domains
 
-kill $pid
-sleep 1
-
 # before 963b0b, 8.8.8.8 responded with 400 if the dns= parameter contained URL
 # unsafe characters
 [ -n "`grep '^< HTTP/' /tmp/nss-tlsd.log | grep -v 200`" ] && exit 1
