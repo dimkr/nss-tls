@@ -122,6 +122,9 @@ sleep 1
 # unsafe characters
 [ -n "`grep '^< HTTP/' /tmp/nss-tlsd.log | grep -v 200`" ] && exit 1
 
+# make sure configuration reloading works
+sed -i /etc/nss-tls.conf s/^resolvers=.*/resolvers=/
+
 # if resolving fails, we should try the next NSS module
 echo "nameserver 185.228.168.168" > /etc/resolv.conf
 sleep 1
