@@ -798,13 +798,17 @@ update_cfg (const gboolean    root)
 {
     gint pnresolvers = nresolvers, i;
 
-    g_object_unref (cfg_monitor);
-    cfg_monitor = NULL;
-    g_object_unref (cfg_file);
+    if (cfg_monitor) {
+        g_object_unref (cfg_monitor);
+        cfg_monitor = NULL;
+        g_object_unref (cfg_file);
+    }
 
-    g_object_unref (resolv_conf_monitor);
-    resolv_conf_monitor = NULL;
-    g_object_unref (resolv_conf);
+    if (resolv_conf_monitor) {
+        g_object_unref (resolv_conf_monitor);
+        resolv_conf_monitor = NULL;
+        g_object_unref (resolv_conf);
+    }
 
     parse_cfg (root);
 
