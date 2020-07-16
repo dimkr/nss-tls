@@ -914,7 +914,7 @@ find_resolv_conf (void)
 
     rpath = g_file_read_link (_PATH_RESCONF, NULL);
     if (!rpath) {
-        return _PATH_RESCONF;
+        return g_strdup (_PATH_RESCONF);
     }
 
 #ifdef NSS_TLS_SYSTEMD
