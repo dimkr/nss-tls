@@ -73,7 +73,7 @@ kill -9 $pid
 sleep 1
 
 # make sure monitoring of resolv.conf changes works when resolv.conf is a link
-echo > /tmp/resolv.conf
+echo > /etc/resolv.conf
 rm -f /etc/resolv.conf
 ln -s ../tmp/resolv.conf /etc/resolv.conf
 ./build/nss-tlsd &
