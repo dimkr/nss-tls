@@ -122,11 +122,18 @@ sleep 1
 # unsafe characters
 [ -n "`grep '^< HTTP/' /tmp/nss-tlsd.log | grep -v 200`" ] && exit 1
 
-# if resolving fails, we sould try the next NSS module
+# if resolving fails, we should try the next NSS module
 echo "nameserver 185.228.168.168" > /etc/resolv.conf
 sleep 1
 getent hosts google.com && exit 1
 sed 's/hosts:.*/hosts: tls dns/' -i /etc/nsswitch.conf
+getent hosts google.com
+
+kill $pid
+sleep 1
+
+# if nss-tlsd is down, we should try the next NSS module
+tlslookup google.com && exit 1
 getent hosts google.com
 
 exit 0
