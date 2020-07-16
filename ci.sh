@@ -44,18 +44,18 @@ IPV6_ONLY_DOMAINS="
     ipv6.google.com
 "
 
-meson --prefix=/usr --buildtype=release -Dstrip=true -Dresconf=/tmp/resolv.conf build
+meson --prefix=/usr --buildtype=release -Dstrip=true build
 ninja -C build install
 
 # make sure automatic DNS to DoH upgrade works
-echo > /tmp/resolv.conf
+echo > /etc/resolv.conf
 ./build/nss-tlsd &
 pid=$!
 sleep 1
 tlslookup google.com && exit 1
 
 # make sure monitoring of resolv.conf changes works
-cat << EOF > /tmp/resolv.conf
+cat << EOF > /etc/resolv.conf
 nameserver 1.1.1.1
 nameserver 9.9.9.9
 EOF
@@ -73,27 +73,9 @@ done
 kill -9 $pid
 sleep 1
 
-# make sure monitoring of resolv.conf changes works when resolv.conf is a link
-echo > /resolv.conf
-rm -f /tmp/resolv.conf
-ln -s ../resolv.conf /tmp/resolv.conf
-./build/nss-tlsd &
-sleep 1
-tlslookup google.com && exit 1
-
-cat << EOF > /resolv.conf
-nameserver 1.1.1.1
-nameserver 9.9.9.9
-EOF
-sleep 1
-tlslookup google.com
-
-kill -9 $pid
-sleep 1
-
 # make sure explicit choice of DoH servers works
-echo -n > /tmp/resolv.conf
-meson configure build -Dresolvers=https://9.9.9.9/dns-query+random,https://dns.google/dns-query+random,https://1.1.1.1/dns-query+random -Dresconf=/tmp/resolv.conf
+echo -n > /etc/resolv.conf
+meson configure build -Dresolvers=https://9.9.9.9/dns-query+random,https://dns.google/dns-query+random,https://1.1.1.1/dns-query+random
 ninja -C build install
 
 CC=clang meson --prefix=/usr -Db_sanitize=address build-asan
@@ -125,7 +107,7 @@ tlslookup dns.google && exit 1
 
 # resolving domains suffixed by the local domain should fail too and change of
 # the local domain should take effect immediately
-echo "search ci" >> /tmp/resolv.conf
+echo "search ci" >> /etc/resolv.conf
 sleep 1
 tlslookup google.com.ci && exit 1
 
@@ -149,14 +131,14 @@ done
 sed -i s/^resolvers=.*/resolvers=/ /etc/nss-tls.conf
 
 # if resolving fails, we should try the next NSS module
-echo "nameserver 185.228.168.168" > /tmp/resolv.conf
+echo "nameserver 185.228.168.168" > /etc/resolv.conf
 sleep 1
 getent hosts google.com && exit 1
 sed 's/hosts:.*/hosts: tls dns/' -i /etc/nsswitch.conf
 getent hosts google.com
 
 # if we have zero DoH servers, we should try the next NSS module
-echo > /tmp/resolv.conf
+echo > /etc/resolv.conf
 sleep 1
 tlslookup google.com && exit 1
 getent hosts google.com

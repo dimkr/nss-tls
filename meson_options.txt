@@ -24,9 +24,3 @@ option(
     value: 'daemon',
     description: 'An unprivileged group to drop to when nss-tlsd runs as root'
 )
-
-option(
-    'resconf',
-    type: 'string',
-    description: 'Path to resolv.conf'
-)
