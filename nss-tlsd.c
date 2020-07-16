@@ -960,6 +960,7 @@ static
 void
 parse_cfg (const gboolean   root)
 {
+    GValue val = G_VALUE_INIT;
     const gchar *dirs[3] = {NULL, NULL, NULL};
     g_autofree gchar *user_dir = NULL;
     gchar **list, **p, *path;
@@ -1050,6 +1051,15 @@ parse_cfg (const gboolean   root)
     g_free (list);
 
 parsed:
+    if (randomize && (nresolvers > 1)) {
+        g_warning ("Disabling deterministic server choice may harm privacy");
+    }
+
+    g_value_init (&val, G_TYPE_INT);
+    g_value_set_int (&val, MAX_CONNS_PER_RESOLVER * nresolvers);
+
+    g_object_set_property (G_OBJECT (soup), SOUP_SESSION_MAX_CONNS, &val);
+
     watch_cfg (path, root);
     watch_resolv_conf (root);
 }
@@ -1145,14 +1155,8 @@ main (int    argc,
                                     NULL);
     }
 
-    parse_cfg (root);
-
     if (root && cache) {
         g_warning ("Enabling cache when running as root may harm privacy");
-    }
-
-    if (randomize && (nresolvers > 1)) {
-        g_warning ("Disabling deterministic server choice may harm privacy");
     }
 
     if (cache) {
@@ -1174,6 +1178,20 @@ main (int    argc,
         g_free (dir);
     }
 
+    soup = soup_session_new_with_options (SOUP_SESSION_TIMEOUT,
+                                          NSS_TLS_TIMEOUT,
+                                          SOUP_SESSION_IDLE_TIMEOUT,
+                                          NSS_TLS_TIMEOUT,
+                                          SOUP_SESSION_MAX_CONNS_PER_HOST,
+                                          MAX_CONNS_PER_RESOLVER,
+                                          NULL);
+#ifdef NSS_TLS_DEBUG
+    logger = soup_logger_new (SOUP_LOGGER_LOG_BODY, 128);
+    soup_session_add_feature (soup, SOUP_SESSION_FEATURE (logger));
+#endif
+
+    parse_cfg (root);
+
     g_unlink (user_socket);
     sa = g_unix_socket_address_new (user_socket);
     s = g_socket_service_new ();
@@ -1184,20 +1202,6 @@ main (int    argc,
                                on_cache_cleanup,
                                NULL);
     }
-
-    soup = soup_session_new_with_options (SOUP_SESSION_TIMEOUT,
-                                          NSS_TLS_TIMEOUT,
-                                          SOUP_SESSION_IDLE_TIMEOUT,
-                                          NSS_TLS_TIMEOUT,
-                                          SOUP_SESSION_MAX_CONNS_PER_HOST,
-                                          MAX_CONNS_PER_RESOLVER,
-                                          SOUP_SESSION_MAX_CONNS,
-                                          MAX_CONNS_PER_RESOLVER * nresolvers,
-                                          NULL);
-#ifdef NSS_TLS_DEBUG
-    logger = soup_logger_new (SOUP_LOGGER_LOG_BODY, 128);
-    soup_session_add_feature (soup, SOUP_SESSION_FEATURE (logger));
-#endif
 
     g_socket_listener_add_address (G_SOCKET_LISTENER (s),
                                    sa,
