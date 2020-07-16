@@ -48,13 +48,18 @@ meson --prefix=/usr --buildtype=release -Dstrip=true build
 ninja -C build install
 
 # make sure automatic DNS to DoH upgrade works
+./build/nss-tlsd &
+pid=$?
+sleep 1
+tlslookup google.com && exit 1
+
+# make sure monitoring of resolv.conf changes works
 cat << EOF > /etc/resolv.conf
 nameserver 1.1.1.1
 nameserver 9.9.9.9
 EOF
-./build/nss-tlsd &
-pid=$?
 sleep 1
+tlslookup google.com
 
 # pick 3 random domains
 domains=`echo $DOMAINS | tr ' ' \\\n | shuf | head -n 3`
@@ -63,7 +68,27 @@ for d in $domains
 do
     tlslookup $d
 done
+
 kill -9 $pid
+sleep 1
+
+# make sure monitoring of resolv.conf changes works when resolv.conf is a link
+echo > /tmp/resolv.conf
+rm -f /etc/resolv.conf
+ln -s ../tmp/resolv.conf /etc/resolv.conf
+./build/nss-tlsd &
+sleep 1
+tlslookup google.com && exit 1
+
+cat << EOF > /tmp/resolv.conf
+nameserver 1.1.1.1
+nameserver 9.9.9.9
+EOF
+sleep 1
+tlslookup google.com
+
+kill -9 $pid
+sleep 1
 
 # make sure explicit choice of DoH servers works
 echo -n > /etc/resolv.conf
