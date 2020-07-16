@@ -49,7 +49,7 @@ ninja -C build install
 
 # make sure automatic DNS to DoH upgrade works
 ./build/nss-tlsd &
-pid=$?
+pid=$!
 sleep 1
 tlslookup google.com && exit 1
 
