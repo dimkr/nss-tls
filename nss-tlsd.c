@@ -1048,7 +1048,7 @@ parse_cfg (const gboolean   root)
         ++nresolvers;
     }
 
-    g_strfreev (list);
+    g_free (list);
 
 parsed:
     if (randomize && (nresolvers > 1)) {
