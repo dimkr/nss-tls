@@ -103,7 +103,6 @@ tlslookup dns.google && exit 1
 # resolving domains suffixed by the local domain should fail too and change of
 # the local domain should take effect immediately
 echo "search ci" >> /etc/resolv.conf
-sleep 1
 tlslookup google.com.ci && exit 1
 
 # before 9169a0, the canonical name was an alias (instead of being the name,
@@ -122,7 +121,6 @@ done
 # unsafe characters
 [ -n "`grep '^< HTTP/' /tmp/nss-tlsd.log | grep -v 200`" ] && exit 1
 
-# make sure configuration reloading works
 sed -i s/^resolvers=.*/resolvers=/ /etc/nss-tls.conf
 
 # if resolving fails, we should try the next NSS module
