@@ -923,7 +923,7 @@ find_resolv_conf (void)
     base = g_path_get_basename (rpath);
     if (strcmp (base, "stub-resolv.conf") == 0) {
         dir = g_path_get_dirname (rpath);
-        return g_build_path ("/", dir, "resolv.conf", NULL);
+        return g_build_filename (dir, "resolv.conf", NULL);
     }
 #endif
 
@@ -1193,10 +1193,9 @@ main (int    argc,
             return EXIT_FAILURE;
         }
 
-        user_socket = g_build_path ("/",
-                                    runtime_dir,
-                                    NSS_TLS_SOCKET_NAME,
-                                    NULL);
+        user_socket = g_build_filename (runtime_dir,
+                                        NSS_TLS_SOCKET_NAME,
+                                        NULL);
     }
 
     if (root && cache) {
