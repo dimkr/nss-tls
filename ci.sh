@@ -48,17 +48,12 @@ meson --prefix=/usr --buildtype=release -Dstrip=true build
 ninja -C build install
 
 # make sure automatic DNS to DoH upgrade works
-echo > /etc/resolv.conf
-./build/nss-tlsd &
-pid=$!
-sleep 1
-tlslookup google.com && exit 1
-
-# make sure monitoring of resolv.conf changes works
 cat << EOF > /etc/resolv.conf
 nameserver 1.1.1.1
 nameserver 9.9.9.9
 EOF
+./build/nss-tlsd &
+pid=$!
 sleep 1
 tlslookup google.com
 
@@ -132,21 +127,26 @@ sed -i s/^resolvers=.*/resolvers=/ /etc/nss-tls.conf
 
 # if resolving fails, we should try the next NSS module
 echo "nameserver 185.228.168.168" > /etc/resolv.conf
+kill -9 $pid
 sleep 1
+./build/nss-tlsd &
+pid=$!
 getent hosts google.com && exit 1
 sed 's/hosts:.*/hosts: tls dns/' -i /etc/nsswitch.conf
 getent hosts google.com
 
 # if we have zero DoH servers, we should try the next NSS module
 echo > /etc/resolv.conf
+kill -9 $pid
 sleep 1
+./build/nss-tlsd &
+pid=$!
 tlslookup google.com && exit 1
 getent hosts google.com
 
+# if nss-tlsd is down, we should try the next NSS module
 kill $pid
 sleep 1
-
-# if nss-tlsd is down, we should try the next NSS module
 tlslookup google.com && exit 1
 getent hosts google.com
 
