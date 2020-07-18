@@ -131,6 +131,7 @@ kill -9 $pid
 sleep 1
 ./build/nss-tlsd &
 pid=$!
+sleep 1
 getent hosts google.com && exit 1
 sed 's/hosts:.*/hosts: tls dns/' -i /etc/nsswitch.conf
 getent hosts google.com
@@ -141,11 +142,12 @@ kill -9 $pid
 sleep 1
 ./build/nss-tlsd &
 pid=$!
+sleep 1
 tlslookup google.com && exit 1
 getent hosts google.com
 
 # if nss-tlsd is down, we should try the next NSS module
-kill $pid
+kill -9 $pid
 sleep 1
 tlslookup google.com && exit 1
 getent hosts google.com
