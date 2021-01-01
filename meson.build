@@ -1,6 +1,6 @@
 # This file is part of nss-tls.
 #
-# Copyright (C) 2018, 2019  Dima Krasner
+# Copyright (C) 2018, 2019, 2020  Dima Krasner
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -44,6 +44,11 @@ add_project_arguments(
     language: 'c'
 )
 
+systemd = dependency('systemd', required: false)
+if systemd.found()
+    add_project_arguments('-DNSS_TLS_SYSTEMD', language: 'c')
+endif
+
 if get_option('buildtype').startswith('debug')
     add_project_arguments('-DNSS_TLS_DEBUG', language: 'c')
 endif
@@ -80,7 +85,6 @@ nss_tls_conf = configure_file(input: 'nss-tls.conf.in',
                               configuration: cfg)
 install_data(nss_tls_conf, install_dir: sys_conf_dir)
 
-systemd = dependency('systemd', required: false)
 if systemd.found()
     nss_tlsd_service = configure_file(input: 'nss-tlsd.service.in',
                                       output: 'nss-tlsd.service',

@@ -45,7 +45,7 @@ nss-tls depends on:
 * [GLib](https://wiki.gnome.org/Projects/GLib)
 * [libsoup](https://wiki.gnome.org/Projects/libsoup)
 
-If [systemd](https://www.freedesktop.org/wiki/Software/systemd/) is present, the installation of nss-tls includes unit files for nss-tlsd.
+If [systemd](https://www.freedesktop.org/wiki/Software/systemd/) is present, the installation of nss-tls includes unit files for nss-tlsd, and nss-tlsd may co-exist with [systemd-resolved](https://www.freedesktop.org/software/systemd/man/systemd-resolved.service.html).
 
 However, nss-tls does not depend on [systemd](https://www.freedesktop.org/wiki/Software/systemd/). When [systemd](https://www.freedesktop.org/wiki/Software/systemd/) is not present, other means of running a nss-tlsd instance for each user (e.g. xinitrc) and root (e.g. an init script) should be used.
 
@@ -69,22 +69,26 @@ Assuming your system runs [systemd](https://www.freedesktop.org/wiki/Software/sy
     systemctl --user start nss-tlsd
     ldconfig
 
-Then, add "tls" to the "hosts" entry in /etc/nsswitch.conf, before "dns" or anything else that contains "dns".
+Then, add "tls" to the "hosts" entry in /etc/nsswitch.conf, before "[resolve](https://www.freedesktop.org/software/systemd/man/nss-resolve.html)", "dns" or anything else that contains "dns".
 
 This will enable a system nss-tlsd instance for all non-interactive processes (which runs as an unprivileged user) and a private instance of nss-tlsd for each user. Name resolving will happen through nss-tls and DNS will be attempted only if nss-tls fails.
 
 ## Choosing a DoH Server
 
-By default, nss-tls performs all name lookup through [Quad9](https://www.quad9.net/doh-quad9-dns-servers/).
+By default, nss-tls uses the DNS servers specified in /etc/resolv.conf, assuming they support DoH.
 
 To use a different DoH server, change the "resolvers" key of nss-tls.conf:
 
     [global]
-    resolvers=https://cloudflare-dns.com/dns-query
+    resolvers=https://9.9.9.9/dns-query
 
 nss-tlsd looks for nss-tls.conf in user's home directory (only when running as an unprivileged user; usually under .config) and the system configuration file directory (usually /etc). If both files exist, nss-tlsd prefers the user's one.
 
-nss-tlsd monitors the chosen configuration file for changes and deletion, so changes are applied without having to restart nss-tlsd.
+nss-tlsd monitors the chosen configuration file and /etc/resolv.conf for changes and deletion, so changes are applied without having to restart nss-tlsd.
+
+If /etc/resolv.conf is a symlink and specifies a stub DNS resolver, because of [systemd-resolved](https://www.freedesktop.org/software/systemd/man/systemd-resolved.service.html), nss-tlsd tries to guess where the real resolv.conf is (usually /run/systemd/resolve/resolv.conf).
+
+If the "resolvers" key is missing or empty, nss-tlsd falls back to using the DNS servers specified in /etc/resolv.conf.
 
 To change the server selection in the default configuration file created at build time, use the "resolvers" build option:
 

@@ -30,8 +30,14 @@ insert_nss_entry() {
                 $line =~ s/(\s+)dns(\s+)/$1tls dns$2/;
                 return $line;
             } else {
-                # add tls at the end
-                return $line . " tls";
+                if (grep { $_ eq "resolve"} @bits) {
+                    # add tls before resolve
+                    $line =~ s/(\s+)resolve(\s+)/$1tls resolve$2/;
+                    return $line;
+                } else {
+                    # add tls at the end
+                    return $line . " tls";
+                }
             }
         }
         s/^(hosts:\s+)(.*)/$1.insert($2)/e;
