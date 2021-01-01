@@ -3,12 +3,12 @@ Priority: optional
 Maintainer: Kan-Ru Chen (陳侃如) <koster@debian.org>
 Build-Depends: debhelper-compat (= 12), libglib2.0-dev (>= 2.44),
  libsoup2.4-dev, systemd, ninja-build, python3-pip, meson
-Standards-Version: 4.5.0
+Standards-Version: 4.5.1
 Section: net
 Rules-Requires-Root: no
 Homepage: https://github.com/dimkr/nss-tls
-#Vcs-Browser: https://salsa.debian.org/debian/nss-tls
-#Vcs-Git: https://salsa.debian.org/debian/nss-tls.git
+Vcs-Browser: https://salsa.debian.org/debian/nss-tls
+Vcs-Git: https://salsa.debian.org/debian/nss-tls.git
 
 Package: nss-tlsd
 Architecture: any

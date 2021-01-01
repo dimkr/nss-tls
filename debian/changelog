@@ -1,3 +1,34 @@
+nss-tls (1.1-1) unstable; urgency=medium
+
+  [ Kan-Ru Chen ]
+  * New upstream 1.1 release (Closes: #977303)
+  * debian/control: bump Standards-Version to 4.5.1, no changes needed
+  * debian/control: Add salsa Vcs-* info
+
+  [ Dima Krasner ]
+  * debian: make systemd.pc a build-time dependency
+  * debian: give nss-tls priority over nss-resolve too
+
+ -- Kan-Ru Chen (陳侃如) <koster@debian.org>  Fri, 01 Jan 2021 14:34:22 +0900
+
+nss-tls (1.0-1) unstable; urgency=medium
+
+  [ Dima Krasner ]
+  * debian: remove 0001-Add-simple-manpage-for-tlslookup.patch, upstreamed
+  * debian: 8.8.8.8 wants dns.google in Host:
+  * debian: 8.8.8.8 documentation recommends GET
+
+  [ Kan-Ru Chen ]
+  * New upstream version 1.0
+
+ -- Kan-Ru Chen (陳侃如) <koster@debian.org>  Wed, 15 Jul 2020 22:45:18 +0900
+
+nss-tls (0~git20200523-2) unstable; urgency=medium
+
+  * Correctly list license as LGPL-2.1+ in debian/copyright
+
+ -- Kan-Ru Chen (陳侃如) <koster@debian.org>  Mon, 13 Jul 2020 11:23:56 +0900
+
 nss-tls (0~git20200523-1) unstable; urgency=medium
 
   * Initial release (Closes: #958710)
