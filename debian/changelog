@@ -1,3 +1,16 @@
+nss-tls (1.1-1) unstable; urgency=medium
+
+  [ Kan-Ru Chen ]
+  * New upstream 1.1 release (Closes: #977303)
+  * debian/control: bump Standards-Version to 4.5.1, no changes needed
+  * debian/control: Add salsa Vcs-* info
+
+  [ Dima Krasner ]
+  * debian: make systemd.pc a build-time dependency
+  * debian: give nss-tls priority over nss-resolve too
+
+ -- Kan-Ru Chen (陳侃如) <koster@debian.org>  Fri, 01 Jan 2021 14:34:22 +0900
+
 nss-tls (1.0-1) unstable; urgency=medium
 
   [ Dima Krasner ]
