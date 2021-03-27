@@ -6,7 +6,7 @@
 |_| |_|___/___/      \__|_|___/
 ```
 
-[![Build Status](https://travis-ci.org/dimkr/nss-tls.svg?branch=master)](https://travis-ci.org/dimkr/nss-tls)
+[![Build Status](https://github.com/dimkr/nss-tls/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/dimkr/nss-tls/actions/workflows/build.yml)
 
 __This is the deprecated 0.x branch of nss-tls, which uses RFC 8484 incompliant, JSON-based resolving. Unless you have a good reason to use this version, use a later version.__
 

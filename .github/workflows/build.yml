@@ -1,0 +1,24 @@
+name: build
+
+on:
+  push:
+    branches:
+      - master
+      - 1.x
+      - 0.x
+  pull_request:
+    branches:
+      - master
+      - 1.x
+      - 0.x
+  schedule:
+    - cron: '0 0 * * 4'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: ci.sh
+        run: docker run --cap-add SYS_PTRACE -e CI -w /root/nss-tls -v `pwd`:/root/nss-tls dimkr/nss-tls:0.x ./ci.sh
