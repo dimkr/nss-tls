@@ -1,0 +1,33 @@
+name: ci-container
+
+on:
+  push:
+    branches:
+      - master
+      - 1.x
+    paths:
+      - Dockerfile
+  schedule:
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+    branches:
+      - master
+      - 1.x
+
+jobs:
+  latest:
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Log in to GitHub Docker Registry
+      uses: docker/login-action@v1
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Build container image
+      uses: docker/build-push-action@v2
+      with:
+        push: true
+        tags: ghcr.io/${{ github.repository }}/ci-container:1.x
