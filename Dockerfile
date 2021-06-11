@@ -1,6 +1,6 @@
 # This file is part of nss-tls.
 #
-# Copyright (C) 2018, 2019, 2020  Dima Krasner
+# Copyright (C) 2018, 2019, 2020, 2021  Dima Krasner
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -16,7 +16,7 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-FROM dimkr/c-dev:clang
+FROM ghcr.io/dimkr/containers/c-dev:clang
 
 RUN apt-get -qq update && apt-get -y --no-install-recommends install pkg-config libglib2.0-dev libsoup2.4-dev systemd firefox && apt-get autoremove --purge && apt-get autoclean
 RUN pip3 install selenium
