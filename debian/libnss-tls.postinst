@@ -27,12 +27,12 @@ insert_nss_entry() {
             }
             if (grep { $_ eq "dns"} @bits) {
                 # add tls before dns
-                $line =~ s/(\s+)dns(\s+)/$1tls dns$2/;
+                $line =~ s/(\s+)dns(.*)/$1tls dns$2/;
                 return $line;
             } else {
                 if (grep { $_ eq "resolve"} @bits) {
                     # add tls before resolve
-                    $line =~ s/(\s+)resolve(\s+)/$1tls resolve$2/;
+                    $line =~ s/(\s)resolve(.*)/$1tls resolve$2/;
                     return $line;
                 } else {
                     # add tls at the end
