@@ -51,17 +51,28 @@ However, nss-tls does not depend on [systemd](https://www.freedesktop.org/wiki/S
 
 nss-tls uses [Meson](http://mesonbuild.com/) as its build system.
 
-On [Debian](http://www.debian.org/) and derivatives, these dependencies can be obtained using:
+## Compilation
 
-    apt install libglib2.0-dev libsoup2.4-dev ninja-build python3-pip
+On [Debian](http://www.debian.org/) and derivatives, install prerequisites:
+
+    apt install libglib2.0-dev libsoup2.4-dev ninja-build python3-pip meson
+    
+If `meson` is not available as package
+
     pip3 install meson
 
-## Usage
+Then compile nss-tls with:
+
+    meson --prefix=/usr --buildtype=release -Dstrip=true build
+
+and install in `/usr/sbin` (requires root access)
+
+    sudo ninja -C build install
+
+## Configuration
 
 Assuming your system runs [systemd](https://www.freedesktop.org/wiki/Software/systemd/):
 
-    meson --prefix=/usr --buildtype=release -Dstrip=true build
-    ninja -C build install
     systemctl daemon-reload
     systemctl enable nss-tlsd
     systemctl start nss-tlsd
