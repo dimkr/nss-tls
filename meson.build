@@ -1,6 +1,6 @@
 # This file is part of nss-tls.
 #
-# Copyright (C) 2018, 2019, 2020  Dima Krasner
+# Copyright (C) 2018, 2019, 2020, 2024  Dima Krasner
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -57,10 +57,10 @@ nss_tlsd = executable('nss-tlsd',
                       'nss-tlsd.c',
                       dependencies: [
                           meson.get_compiler('c').find_library('resolv'),
-                          dependency('glib-2.0', version: '>=2.44'),
+                          dependency('glib-2.0', version: '>=2.68'),
                           dependency('gio-2.0'),
                           dependency('gio-unix-2.0'),
-                          dependency('libsoup-2.4'),
+                          dependency('libsoup-3.0'),
                       ],
                       install: true,
                       install_dir: get_option('sbindir'))

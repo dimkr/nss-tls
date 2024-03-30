@@ -2,23 +2,19 @@ name: build
 
 on:
   push:
-    branches:
-      - master
-      - 1.x
-      - 0.x
   pull_request:
-    branches:
-      - master
-      - 1.x
-      - 0.x
   schedule:
     - cron: '0 0 * * 4'
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: debian:bookworm-slim
     steps:
+      - run: apt-get -qq update && apt-get -y --no-install-recommends install gcc clang meson pkgconf libglib2.0-dev libsoup-3.0-dev systemd firefox python3-pip && apt-get autoremove --purge && apt-get autoclean
+      - run: pip3 install selenium
+      - run: curl -Lo- https://github.com/mozilla/geckodriver/releases/download/v0.34.0/geckodriver-v0.34.0-linux64.tar.gz | tar -xzf- -C /usr/local/bin
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: ci.sh
-        run: docker run --cap-add SYS_PTRACE -e CI -w /root/nss-tls -v `pwd`:/root/nss-tls ghcr.io/dimkr/nss-tls/ci-container:latest ./ci.sh
+      - run: ./ci.sh

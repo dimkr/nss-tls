@@ -1,6 +1,6 @@
 # This file is part of nss-tls.
 #
-# Copyright (C) 2018, 2019, 2020, 2021  Dima Krasner
+# Copyright (C) 2018, 2019, 2020, 2021, 2024  Dima Krasner
 #
 # This library is free software; you can redistribute it and/or
 # modify it under the terms of the GNU Lesser General Public
@@ -16,8 +16,8 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-FROM ghcr.io/dimkr/containers/c-dev:clang
+FROM debian:bookworm-slim
 
-RUN apt-get -qq update && apt-get -y --no-install-recommends install pkg-config libglib2.0-dev libsoup2.4-dev systemd firefox && apt-get autoremove --purge && apt-get autoclean
+RUN apt-get -qq update && apt-get -y --no-install-recommends install gcc clang meson pkgconf libglib2.0-dev libsoup-3.0-dev systemd firefox python3-pip && apt-get autoremove --purge && apt-get autoclean
 RUN pip3 install selenium
-RUN wget -O- https://github.com/mozilla/geckodriver/releases/download/v0.26.0/geckodriver-v0.26.0-linux64.tar.gz | tar -xzf- -C /usr/local/bin
+RUN wget -O- https://github.com/mozilla/geckodriver/releases/download/v0.34.0/geckodriver-v0.34.0-linux64.tar.gz | tar -xzf- -C /usr/local/bin
