@@ -355,11 +355,11 @@ resolve_domain (struct nss_tls_session *session)
     soup_message_set_flags (session->message, flags | SOUP_MESSAGE_IDEMPOTENT);
 
     if (method == NSS_TLS_METHOD_POST) {
-        body = g_bytes_new(buf, len);
+        body = g_bytes_new (buf, len);
         soup_message_set_request_body_from_bytes (session->message,
                                                   "application/dns-message",
                                                   body);
-	g_object_unref (body);
+	g_bytes_unref (body);
     }
 
     soup_message_headers_append (soup_message_get_request_headers (session->message),
@@ -997,7 +997,6 @@ static
 void
 parse_cfg (const gboolean   root)
 {
-    GValue val = G_VALUE_INIT;
     const gchar *dirs[3] = {NULL, NULL, NULL};
     g_autofree gchar *user_dir = NULL;
     gchar **list, **p;
@@ -1099,13 +1098,6 @@ parse_cfg (const gboolean   root)
 parsed:
     if (randomize && (nresolvers > 1)) {
         g_warning ("Disabling deterministic server choice may harm privacy");
-    }
-
-    if (nresolvers > 0) {
-        g_value_init (&val, G_TYPE_INT);
-        g_value_set_int (&val, MAX_CONNS_PER_RESOLVER * nresolvers);
-
-        g_object_set_property (G_OBJECT (soup), "max-conns", &val);
     }
 
     if (path) {
@@ -1230,10 +1222,12 @@ main (int    argc,
         g_free (dir);
     }
 
-    soup = soup_session_new_with_options ("timeput",
+    soup = soup_session_new_with_options ("timeout",
                                           NSS_TLS_TIMEOUT,
                                           "idle-timeout",
                                           NSS_TLS_TIMEOUT,
+                                          "max-conns",
+                                          MAX_CONNS_PER_RESOLVER * MAX_RESOLVERS,
                                           "max-conns-per-host",
                                           MAX_CONNS_PER_RESOLVER,
                                           NULL);
