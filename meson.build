@@ -60,7 +60,7 @@ nss_tlsd = executable('nss-tlsd',
                           dependency('glib-2.0', version: '>=2.44'),
                           dependency('gio-2.0'),
                           dependency('gio-unix-2.0'),
-                          dependency('libsoup-2.4'),
+                          dependency('libsoup-3.0'),
                       ],
                       install: true,
                       install_dir: get_option('sbindir'))

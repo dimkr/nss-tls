@@ -71,7 +71,7 @@ struct nss_tls_session {
 
 static SoupSession *soup = NULL;
 static struct {
-    SoupURI *uri;
+    GUri *uri;
     gchar *url;
     const gchar *domain;
     enum nss_tls_methods method;
@@ -154,7 +154,7 @@ add_to_cache (const struct nss_tls_req *req, struct nss_tls_res *res)
     }
 
     key = g_strdup (req->name);
-    val = g_memdup (res, sizeof (*res));
+    val = g_memdup2 (res, sizeof (*res));
 
     g_hash_table_insert (cache, key, val);
     g_debug ("Caching %s until %"G_GINT64_FORMAT, req->name, res->expiry);
@@ -353,20 +353,21 @@ resolve_domain (struct nss_tls_session *session)
     flags = soup_message_get_flags (session->message);
     soup_message_set_flags (session->message, flags | SOUP_MESSAGE_IDEMPOTENT);
 
-    if (method == NSS_TLS_METHOD_POST) {
-        soup_message_set_request (session->message,
-                                  "application/dns-message",
-                                  SOUP_MEMORY_TAKE,
-                                  (const char *)buf,
-                                  (gsize)len);
-    }
-
-    soup_message_headers_append (session->message->request_headers,
+    soup_message_headers_append (soup_message_get_request_headers (session->message),
                                  "Accept",
                                  "application/dns-message");
 
+    if (method == NSS_TLS_METHOD_POST) {
+        GBytes *bytes = g_bytes_new_take (buf, (gsize)len);
+        soup_message_set_request_body_from_bytes (session->message,
+                                                  "application/dns-message",
+                                                  bytes);
+        g_bytes_unref (bytes);
+    }
+
     soup_session_send_async (soup,
                              session->message,
+                             G_PRIORITY_DEFAULT,
                              NULL,
                              on_response,
                              session);
@@ -611,15 +612,15 @@ on_response (GObject         *source_object,
         goto cleanup;
     }
 
-    if (!SOUP_STATUS_IS_SUCCESSFUL (session->message->status_code)) {
+    if (!SOUP_STATUS_IS_SUCCESSFUL (soup_message_get_status (session->message))) {
         g_warning ("Failed to query %s: HTTP %d",
                    session->request.name,
-                   session->message->status_code);
+                   soup_message_get_status (session->message));
         goto cleanup;
     }
 
     type = soup_message_headers_get_content_type (
-        session->message->response_headers,
+        soup_message_get_response_headers (session->message),
         NULL
     );
     if (type && strcmp (type, "application/dns-message")) {
@@ -813,7 +814,7 @@ update_cfg (const gboolean    root)
     parse_cfg (root);
 
     for (i = 0; i < pnresolvers; ++i) {
-        soup_uri_free (resolvers[i].uri);
+        g_uri_unref (resolvers[i].uri);
         g_free (resolvers[i].url);
     }
 
@@ -895,8 +896,8 @@ add_resolver (const char    *addr)
     } else {
         resolvers[nresolvers].url = g_strconcat ("https://", addr, "/dns-query", NULL);
     }
-    resolvers[nresolvers].uri = soup_uri_new (resolvers[nresolvers].url);
-    resolvers[nresolvers].domain = soup_uri_get_host (resolvers[nresolvers].uri);
+    resolvers[nresolvers].uri = g_uri_parse (resolvers[nresolvers].url, G_URI_FLAGS_NONE, NULL);
+    resolvers[nresolvers].domain = g_uri_get_host (resolvers[nresolvers].uri);
     resolvers[nresolvers].method = NSS_TLS_METHOD_POST;
 
     ++nresolvers;
@@ -992,7 +993,6 @@ static
 void
 parse_cfg (const gboolean   root)
 {
-    GValue val = G_VALUE_INIT;
     const gchar *dirs[3] = {NULL, NULL, NULL};
     g_autofree gchar *user_dir = NULL;
     gchar **list, **p;
@@ -1065,7 +1065,7 @@ parse_cfg (const gboolean   root)
             ++plus;
         }
 
-        resolvers[nresolvers].uri = soup_uri_new (*p);
+        resolvers[nresolvers].uri = g_uri_parse (*p, G_URI_FLAGS_NONE, NULL);
         if (!resolvers[nresolvers].uri) {
             g_warning ("Bad resolver: %s", *p);
             g_free (*p);
@@ -1073,7 +1073,7 @@ parse_cfg (const gboolean   root)
         }
 
         resolvers[nresolvers].url = *p;
-        resolvers[nresolvers].domain = soup_uri_get_host (resolvers[nresolvers].uri);
+        resolvers[nresolvers].domain = g_uri_get_host (resolvers[nresolvers].uri);
         resolvers[nresolvers].method = NSS_TLS_METHOD_POST;
 
         if (plus) {
@@ -1094,13 +1094,6 @@ parse_cfg (const gboolean   root)
 parsed:
     if (randomize && (nresolvers > 1)) {
         g_warning ("Disabling deterministic server choice may harm privacy");
-    }
-
-    if (nresolvers > 0) {
-        g_value_init (&val, G_TYPE_INT);
-        g_value_set_int (&val, MAX_CONNS_PER_RESOLVER * nresolvers);
-
-        g_object_set_property (G_OBJECT (soup), SOUP_SESSION_MAX_CONNS, &val);
     }
 
     if (path) {
@@ -1225,15 +1218,13 @@ main (int    argc,
         g_free (dir);
     }
 
-    soup = soup_session_new_with_options (SOUP_SESSION_TIMEOUT,
-                                          NSS_TLS_TIMEOUT,
-                                          SOUP_SESSION_IDLE_TIMEOUT,
-                                          NSS_TLS_TIMEOUT,
-                                          SOUP_SESSION_MAX_CONNS_PER_HOST,
+    soup = soup_session_new_with_options ("max-conns-per-host",
                                           MAX_CONNS_PER_RESOLVER,
+                                          "timeout",
+                                          NSS_TLS_TIMEOUT,
                                           NULL);
 #ifdef NSS_TLS_DEBUG
-    logger = soup_logger_new (SOUP_LOGGER_LOG_BODY, 128);
+    logger = soup_logger_new (SOUP_LOGGER_LOG_BODY);
     soup_session_add_feature (soup, SOUP_SESSION_FEATURE (logger));
 #endif
 
@@ -1271,7 +1262,7 @@ main (int    argc,
     g_main_loop_run (loop);
 
     for (i = 0; i < nresolvers; ++i) {
-        soup_uri_free (resolvers[i].uri);
+        g_uri_unref (resolvers[i].uri);
         g_free (resolvers[i].url);
     }
 

@@ -18,6 +18,6 @@
 
 FROM ghcr.io/dimkr/containers/c-dev:clang
 
-RUN apt-get -qq update && apt-get -y --no-install-recommends install pkg-config libglib2.0-dev libsoup2.4-dev systemd firefox && apt-get autoremove --purge && apt-get autoclean
+RUN apt-get -qq update && apt-get -y --no-install-recommends install pkg-config libglib2.0-dev libsoup-3.0-dev systemd firefox && apt-get autoremove --purge && apt-get autoclean
 RUN pip3 install selenium
 RUN wget -O- https://github.com/mozilla/geckodriver/releases/download/v0.26.0/geckodriver-v0.26.0-linux64.tar.gz | tar -xzf- -C /usr/local/bin
