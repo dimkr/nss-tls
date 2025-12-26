@@ -78,6 +78,7 @@ static struct {
 } resolvers[MAX_RESOLVERS];
 static gint32 nresolvers = 0;
 
+static char *socketpath;
 static gboolean cache = FALSE;
 static gboolean randomize = FALSE;
 static GHashTable *caches[2] = {NULL, NULL};
@@ -1115,7 +1116,8 @@ static GOptionEntry opts[] = {
         &randomize,
         "Choose a random server every time",
         NULL
-    }
+    },
+    {"socket", 's', 0, G_OPTION_ARG_FILENAME, &socketpath, "Socket to listen for requests", NULL}
 };
 
 static
@@ -1146,7 +1148,7 @@ main (int    argc,
     const gchar *runtime_dir;
     gchar *dir;
     struct passwd *user;
-    gchar *user_socket = root_socket;
+    gchar *user_socket;
 #ifdef NSS_TLS_DEBUG
     static SoupLogger *logger;
 #endif
@@ -1184,7 +1186,13 @@ main (int    argc,
         }
 
         mode = 0666;
-    } else {
+    }
+
+    if (socketpath)
+        user_socket = socketpath;
+    else if (root)
+        user_socket = root_socket;
+    else {
         runtime_dir = g_get_user_runtime_dir ();
         if (!runtime_dir) {
             return EXIT_FAILURE;
